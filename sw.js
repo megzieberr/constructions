@@ -3,7 +3,7 @@
    cache-first for icons. Works offline from the last visit.
 
    ⚠ BUMP THIS VERSION ON EVERY SHIPPABLE CHANGE. */
-const CACHE = "con-v1";
+const CACHE = "con-v2";
 
 const SHELL = ["./", "./index.html", "./manifest.json", "./icons/icon-192.png", "./icons/icon-512.png"];
 

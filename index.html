@@ -41,6 +41,12 @@ html,body{margin:0;height:100%;overflow:hidden;background:var(--paper);color:var
 .seg{display:flex;background:var(--tin);border-radius:23px;padding:4px;gap:2px;box-shadow:0 2px 10px rgba(30,42,68,.18)}
 .seg button{height:38px;padding:0 14px;border:0;border-radius:19px;background:transparent;color:var(--cream);font:600 14px/1 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;cursor:pointer}
 .seg button[aria-pressed="true"]{background:var(--pencil);color:var(--tin)}
+.seg.corner{position:absolute;bottom:14px;z-index:5;align-items:center}
+.seg.corner button{min-width:44px;height:40px;font-size:20px;padding:0 12px}
+.seg.corner #zoomReset{font-size:14px;min-width:64px}
+#zoomBar{right:12px}
+#proBar{left:12px}
+.seg-label{color:var(--cream);font:600 14px/1 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding:0 8px 0 10px}
 .seg.light{background:#EEF1F6;box-shadow:none}
 .seg.light button{color:var(--tin)}
 .pop{position:fixed;z-index:20;background:#fff;border-radius:18px;box-shadow:0 8px 30px rgba(30,42,68,.25);padding:14px 16px;display:none;max-width:calc(100vw - 24px)}
@@ -116,6 +122,16 @@ html,body{margin:0;height:100%;overflow:hidden;background:var(--paper);color:var
       <button class="pill" id="saveBtn"><svg viewBox="0 0 24 24"><path d="M12 4v11"/><path d="M7 10l5 5 5-5"/><path d="M5 20h14"/></svg>Save picture</button>
       <button class="pill round" id="helpBtn" title="How the tools work" aria-label="Help">?</button>
     </div>
+    <div class="seg corner" id="proBar" role="group" aria-label="Protractor size" hidden>
+      <span class="seg-label">Protractor</span>
+      <button id="proSmall" aria-label="Smaller protractor">−</button>
+      <button id="proBig" aria-label="Bigger protractor">+</button>
+    </div>
+    <div class="seg corner" id="zoomBar" role="group" aria-label="Zoom">
+      <button id="zoomOut" aria-label="Zoom out">−</button>
+      <button id="zoomReset" title="Back to 100%">100%</button>
+      <button id="zoomIn" aria-label="Zoom in">+</button>
+    </div>
     <div id="toast" role="status" aria-live="polite"></div>
   </main>
 </div>
@@ -168,6 +184,12 @@ html,body{margin:0;height:100%;overflow:hidden;background:var(--paper);color:var
       <li><b>Eraser</b>: touch or rub across a line and the whole line goes. Holding the S Pen button may erase too.</li>
       <li>Undo and redo go one step at a time. Clear can be undone as well.</li>
     </ul>
+    <h4>Zoom and protractor size</h4>
+    <ul>
+      <li>Pinch with <b>two fingers</b> to zoom, and drag with two fingers to move the page. Or use <b>− 100% +</b> at the bottom right; tap 100% to go back.</li>
+      <li>Everything zooms together, so lengths on the ruler stay true. Saved pictures are not affected.</li>
+      <li>While the protractor is out, <b>Protractor − +</b> at the bottom left makes it smaller or bigger.</li>
+    </ul>
     <label class="set"><input type="checkbox" id="fingerOpt"> Let my finger draw too (normally only the S Pen and the mouse draw)</label>
     <button class="pill close" id="helpClose">Got it</button>
   </div>
@@ -185,7 +207,8 @@ const PALETTE=['#1F2328','#8A8F98','#1F5FD1','#D7263D','#2E9E4F','#C2189B','#7B3
 const WIDTHS=[{w:2,label:'Thin'},{w:3.5,label:'Medium'},{w:6,label:'Thick'}];
 const COMPASS_L=240, R_MAX=1.85*COMPASS_L, R_MIN=6, HANDLE=56;
 const RULER_LEN=30*CM, RULER_W=72, RULER_PAD=14, KNOB_R=17, KNOB_OFF=28;
-const PRO_R=170;
+const PRO_R=170, PRO_MIN=100, PRO_MAX=340, PRO_STEP=20;
+const ZMIN=0.4, ZMAX=4;
 const STORE='constructions.v1';
 
 // ---------- geometry ----------
@@ -253,8 +276,13 @@ const S={
   strokes:[],past:[],future:[],
   show:{compass:false,ruler:false,protractor:false},
   order:['protractor','ruler','compass'],
-  compass:null,ruler:null,protractor:null
+  compass:null,ruler:null,protractor:null,
+  view:{z:1,x:0,y:0}   // screen = world*z + (x,y); strokes and tools live in world units
 };
+const V=S.view;
+const tol=v=>v/V.z;    // snap and eraser distances stay the same size on screen at any zoom
+const toWorld=s=>[(s[0]-V.x)/V.z,(s[1]-V.y)/V.z];
+const toScreen=w=>[w[0]*V.z+V.x,w[1]*V.z+V.y];
 let G=null;            // the gesture in progress
 let hover=null,hoverPt=null;
 
@@ -270,10 +298,10 @@ function snapData(){
 }
 function snapPoint(p){
   const {pts,curves}=snapData();
-  let best=null,bd=SNAP_PT;
+  let best=null,bd=tol(SNAP_PT);
   for(const q of pts){const d=dist(p,q);if(d<bd){bd=d;best=q;}}
   if(best)return {p:best.slice(),hit:true};
-  bd=SNAP_CURVE;
+  bd=tol(SNAP_CURVE);
   for(const s of curves){const q=nearestOnCurve(p,s);if(q){const d=dist(p,q);if(d<bd){bd=d;best=q;}}}
   if(best)return {p:best,hit:true};
   return {p:p.slice(),hit:false};
@@ -281,9 +309,9 @@ function snapPoint(p){
 // turn snapping shared by ruler and protractor: the edge clicks through a point, else onto 45° steps
 function snapTurn(raw,pivot,lx,minX,maxX,usePoints){
   if(usePoints){
-    const u=dirOf(raw),n=[-u[1],u[0]];let best=null,bd=10;
+    const u=dirOf(raw),n=[-u[1],u[0]];let best=null,bd=tol(10);
     for(const q of snapData().pts){
-      const v=sub(q,pivot);if(Math.hypot(v[0],v[1])<24)continue;
+      const v=sub(q,pivot);if(Math.hypot(v[0],v[1])<tol(24))continue;
       const along=lx+dot(v,u);if(along<minX||along>maxX)continue;
       const perp=Math.abs(dot(v,n));if(perp<bd){bd=perp;best=q;}
     }
@@ -317,18 +345,21 @@ function resize(){
   const r=stage.getBoundingClientRect();W=r.width;H=r.height;DPR=Math.max(1,window.devicePixelRatio||1);rect=r;
   for(const c of [bgC,inkC,liveC]){
     c.width=Math.round(W*DPR);c.height=Math.round(H*DPR);c.style.width=W+'px';c.style.height=H+'px';
-    c.getContext('2d').setTransform(DPR,0,0,DPR,0,0);
   }
   drawBg();drawInk();drawLive();
 }
+function clearCanvas(x){x.setTransform(1,0,0,1,0,0);x.clearRect(0,0,x.canvas.width,x.canvas.height);}
+function worldTf(x){x.setTransform(DPR*V.z,0,0,DPR*V.z,DPR*V.x,DPR*V.y);}
+function screenTf(x){x.setTransform(DPR,0,0,DPR,0,0);}
 function drawBg(){
   bgX.save();bgX.setTransform(1,0,0,1,0,0);
   bgX.fillStyle='#fff';bgX.fillRect(0,0,bgC.width,bgC.height);
   if(S.bg==='grid'){
-    const step=CM*DPR,lw=Math.max(1,Math.round(DPR*0.9)),off=lw%2?0.5:0;
+    const step=CM*V.z*DPR,lw=Math.max(1,Math.round(DPR*0.9)),off=lw%2?0.5:0;
+    const x0=((V.x*DPR)%step+step)%step,y0=((V.y*DPR)%step+step)%step;
     bgX.strokeStyle='#CFDCEC';bgX.lineWidth=lw;bgX.beginPath();
-    for(let x=0;x<=bgC.width;x+=step){const X=Math.round(x)+off;bgX.moveTo(X,0);bgX.lineTo(X,bgC.height);}
-    for(let y=0;y<=bgC.height;y+=step){const Y=Math.round(y)+off;bgX.moveTo(0,Y);bgX.lineTo(bgC.width,Y);}
+    for(let x=x0;x<=bgC.width;x+=step){const X=Math.round(x)+off;bgX.moveTo(X,0);bgX.lineTo(X,bgC.height);}
+    for(let y=y0;y<=bgC.height;y+=step){const Y=Math.round(y)+off;bgX.moveTo(0,Y);bgX.lineTo(bgC.width,Y);}
     bgX.stroke();
   }
   bgX.restore();
@@ -349,11 +380,19 @@ function drawStroke(x,s){
   for(let i=1;i<P.length-1;i++){const m=mid(P[i],P[i+1]);x.quadraticCurveTo(P[i][0],P[i][1],m[0],m[1]);}
   const L=P[P.length-1];x.lineTo(L[0],L[1]);x.stroke();
 }
-function drawInk(hide){inkX.clearRect(0,0,W,H);for(const s of S.strokes)if(!hide||!hide.has(s))drawStroke(inkX,s);}
+function drawInk(hide){clearCanvas(inkX);worldTf(inkX);for(const s of S.strokes)if(!hide||!hide.has(s))drawStroke(inkX,s);}
 
-let livePending=false;
+let livePending=false,viewPending=false;
 function requestLive(){if(livePending)return;livePending=true;requestAnimationFrame(flushLive);setTimeout(flushLive,40);}
-function flushLive(){if(!livePending)return;livePending=false;drawLive();}
+function flushLive(){
+  if(viewPending){viewPending=false;drawBg();drawInk(G&&G.k==='erase'?G.gone:null);}
+  if(!livePending)return;livePending=false;drawLive();
+}
+function requestView(){viewPending=true;requestLive();syncZoom();save();}
+function zoomAt(s,f){
+  const z=clamp(V.z*f,ZMIN,ZMAX),w=toWorld(s);
+  V.z=z;V.x=s[0]-w[0]*z;V.y=s[1]-w[1]*z;requestView();
+}
 
 // ---------- compass ----------
 function cGeo(C){
@@ -453,7 +492,7 @@ function hitRuler(p){
   return null;
 }
 function stickRuler(){
-  const R=S.ruler,g=rGeo(R);let best=null,bd=STICK;
+  const R=S.ruler,g=rGeo(R);let best=null,bd=tol(STICK);
   for(const q of snapData().pts){
     const [x,y]=g.toL(q);if(x<-RULER_PAD||x>RULER_LEN+RULER_PAD)continue;
     for(const [edge,ey] of [['A',0],['B',RULER_W]]){const d=y-ey;if(Math.abs(d)<bd){bd=Math.abs(d);best={q,edge,d};}}
@@ -463,13 +502,13 @@ function stickRuler(){
 function edgeTargets(base,u,n){
   const xs=[],a=add(base,mul(u,-RULER_PAD)),b=add(base,mul(u,RULER_LEN+RULER_PAD));
   const {pts,curves}=snapData();
-  for(const q of pts){const v=sub(q,base);if(Math.abs(dot(v,n))<=2.5)xs.push(dot(v,u));}
+  for(const q of pts){const v=sub(q,base);if(Math.abs(dot(v,n))<=tol(2.5))xs.push(dot(v,u));}
   const edge={t:'line',a,b};
   for(const s of curves)for(const q of intersect(edge,s))xs.push(dot(sub(q,base),u));
   return xs;
 }
 function snapEdgeX(x,targets,from){
-  let best=null,bd=14;
+  let best=null,bd=tol(14);
   for(const t of targets){const d=Math.abs(t-x);if(d<bd){bd=d;best=t;}}
   if(best!==null)return {x:clamp(best,-RULER_PAD,RULER_LEN+RULER_PAD),hit:true};
   const v=from===undefined?Math.round(x/MM)*MM:from+Math.round((x-from)/MM)*MM;
@@ -508,15 +547,15 @@ function drawRuler(x,zone){
 // ---------- protractor ----------
 function pGeo(P){const u=dirOf(P.ang),up=[u[1],-u[0]];return {u,up,toL:p=>{const v=sub(p,P.o);return [dot(v,u),dot(v,up)];}};}
 function hitPro(p){
-  const [x,y]=pGeo(S.protractor).toL(p);
-  const inside=(y<=0&&y>=-14&&Math.abs(x)<=PRO_R)||(y>0&&Math.hypot(x,y)<=PRO_R+4);
+  const R=S.protractor.r,[x,y]=pGeo(S.protractor).toL(p);
+  const inside=(y<=0&&y>=-14&&Math.abs(x)<=R)||(y>0&&Math.hypot(x,y)<=R+4);
   if(!inside)return null;
-  if(Math.hypot(x-PRO_R,y)<=0.36*PRO_R)return 'turnR';
-  if(Math.hypot(x+PRO_R,y)<=0.36*PRO_R)return 'turnL';
+  if(Math.hypot(x-R,y)<=0.36*R)return 'turnR';
+  if(Math.hypot(x+R,y)<=0.36*R)return 'turnL';
   return 'move';
 }
 function drawPro(x,zone){
-  const P=S.protractor,R=PRO_R;
+  const P=S.protractor,R=P.r;
   x.save();x.translate(P.o[0],P.o[1]);x.rotate(P.ang);
   if(zone==='turnR'||zone==='turnL'){
     const sx=zone==='turnR'?1:-1;x.beginPath();x.moveTo(sx*R,0);x.arc(sx*R,0,0.36*R,sx>0?PI:-PI/2,sx>0?PI*1.5:0);x.closePath();
@@ -535,7 +574,7 @@ function drawPro(x,zone){
   for(let d=0;d<=180;d+=10){
     const t=d*PI/180,c=Math.cos(t),s=-Math.sin(t);
     x.font='600 10px system-ui,-apple-system,"Segoe UI",Roboto,sans-serif';x.fillText(String(180-d),(R-24)*c,(R-24)*s);
-    x.font='9px system-ui,-apple-system,"Segoe UI",Roboto,sans-serif';x.fillText(String(d),(R-40)*c,(R-40)*s);
+    if(R>=140){x.font='9px system-ui,-apple-system,"Segoe UI",Roboto,sans-serif';x.fillText(String(d),(R-40)*c,(R-40)*s);}
   }
   x.lineWidth=1;x.beginPath();x.moveTo(-R,0);x.lineTo(R,0);x.moveTo(0,0);x.lineTo(0,-12);x.stroke();
   x.beginPath();x.arc(0,0,3,0,TAU);x.stroke();
@@ -562,7 +601,7 @@ function rulerLine(){
 }
 function zoneFor(t){if(G&&G.tool===t)return G.zone;if(!G&&hover&&hover.tool===t)return hover.zone;return null;}
 function drawLive(){
-  const x=liveX;x.clearRect(0,0,W,H);
+  const x=liveX;clearCanvas(x);worldTf(x);
   if(G){
     if(G.k==='pen'||G.k==='line')drawStroke(x,G.s);
     if(G.k==='rulerDraw'&&Math.abs(G.xe-G.xs)>=1)drawStroke(x,rulerLine());
@@ -572,18 +611,22 @@ function drawLive(){
     if(!S.show[t]||!S[t])continue;const z=zoneFor(t);
     if(t==='compass')drawCompass(x,z);else if(t==='ruler')drawRuler(x,z);else drawPro(x,z);
   }
-  if(S.show.ruler&&S.ruler&&S.ruler.stuck)ring(x,S.ruler.stuck.p);
-  if(G){for(const m of [G.snapA,G.snap,G.target])if(m)ring(x,m);if(G.label)label(x,G.label.p,G.label.text);}
+  // markers, labels and the eraser ring stay the same size on screen at any zoom
+  screenTf(x);
+  if(S.show.ruler&&S.ruler&&S.ruler.stuck)ring(x,toScreen(S.ruler.stuck.p));
+  if(G){for(const m of [G.snapA,G.snap,G.target])if(m)ring(x,toScreen(m));if(G.label)label(x,toScreen(G.label.p),G.label.text);}
   const ep=G&&G.k==='erase'?G.last:(!G&&S.mode==='eraser'&&hoverPt&&!hover?hoverPt:null);
-  if(ep){x.beginPath();x.arc(ep[0],ep[1],ERASE_R,0,TAU);x.strokeStyle='rgba(30,42,68,.6)';x.lineWidth=1.5;x.stroke();}
+  if(ep){const s=toScreen(ep);x.beginPath();x.arc(s[0],s[1],ERASE_R,0,TAU);x.strokeStyle='rgba(30,42,68,.6)';x.lineWidth=1.5;x.stroke();}
 }
 
 // ---------- tools on screen ----------
 function placeTool(t,force){
-  const off=p=>!p||p[0]<0||p[0]>W||p[1]<0||p[1]>H;
-  if(t==='compass'&&(force||!S.compass||off(S.compass.c1)))S.compass={c1:[W*0.42,H*0.68],r:160,th:0,locked:false};
-  if(t==='ruler'&&(force||!S.ruler||off(S.ruler.o)))S.ruler={o:[Math.max(60,(W-RULER_LEN)/2),H*0.78],ang:0,stuck:null};
-  if(t==='protractor'&&(force||!S.protractor||off(S.protractor.o)))S.protractor={o:[W*0.62,H*0.62],ang:0};
+  const off=p=>{if(!p)return true;const s=toScreen(p);return s[0]<0||s[0]>W||s[1]<0||s[1]>H;};
+  if(t==='compass'&&(force||!S.compass||off(S.compass.c1)))S.compass={c1:toWorld([W*0.42,H*0.68]),r:160,th:0,locked:false};
+  if(t==='ruler'&&(force||!S.ruler||off(S.ruler.o)))
+    S.ruler={o:toWorld([Math.max(60,(W-RULER_LEN*V.z)/2),H*0.78]),ang:0,stuck:null};
+  if(t==='protractor'&&(force||!S.protractor||off(S.protractor.o)))
+    S.protractor={o:toWorld([W*0.62,H*0.62]),ang:0,r:S.protractor?S.protractor.r:PRO_R};
 }
 function toolHit(p){
   for(let i=S.order.length-1;i>=0;i--){
@@ -597,7 +640,8 @@ const toFront=t=>{S.order=S.order.filter(o=>o!==t);S.order.push(t);};
 
 // ---------- gestures ----------
 function accept(e){return e.pointerType==='pen'||e.pointerType==='mouse'||(S.allowFinger&&e.pointerType==='touch');}
-function pt(e){return [e.clientX-rect.left,e.clientY-rect.top];}
+function screenPt(e){return [e.clientX-rect.left,e.clientY-rect.top];}
+function pt(e){return toWorld(screenPt(e));}
 
 function startTool(h,p,id){
   const t=h.tool,z=h.zone;toFront(t);
@@ -631,7 +675,7 @@ function moveGesture(e,p){
   if(k==='pen'){
     const evs=e.getCoalescedEvents?e.getCoalescedEvents():[];
     const list=evs.length?evs.map(pt):[p],P=G.s.p;
-    for(const q of list)if(dist(q,P[P.length-1])>=0.7)P.push([Math.round(q[0]*10)/10,Math.round(q[1]*10)/10]);
+    for(const q of list)if(dist(q,P[P.length-1])>=tol(0.7))P.push([Math.round(q[0]*100)/100,Math.round(q[1]*100)/100]);
   }else if(k==='line'){
     const sn=snapPoint(p);G.s.b=sn.p;G.snap=sn.hit?sn.p:null;
     G.label={p:add(sn.p,[0,-26]),text:fmtCm(dist(G.s.a,G.s.b))};
@@ -664,7 +708,9 @@ function moveGesture(e,p){
     const sn=snapPoint(add(p,G.off));S.protractor.o=sn.p;G.snap=sn.hit?sn.p:null;
   }else if(k==='pTurn'){
     const P=S.protractor;G.raw+=sweep(G.prev,p,P.o);G.prev=p;
-    const s=snapTurn(G.raw,P.o,0,-4*PRO_R,4*PRO_R,true);P.ang=s.ang;G.target=s.target;
+    const s=snapTurn(G.raw,P.o,0,-4*P.r,4*P.r,true);P.ang=s.ang;G.target=s.target;
+  }else if(k==='pan'){
+    const s=screenPt(e);V.x=G.x0+s[0]-G.s0[0];V.y=G.y0+s[1]-G.s0[1];requestView();
   }
   requestLive();
 }
@@ -672,7 +718,7 @@ function endGesture(cancelled){
   const g=G;G=null;
   if(!cancelled){
     if(g.k==='pen')addStroke(g.s);
-    else if(g.k==='line'){if(dist(g.s.a,g.s.b)>=5)addStroke(g.s);}
+    else if(g.k==='line'){if(dist(g.s.a,g.s.b)>=tol(5))addStroke(g.s);}
     else if(g.k==='erase'){if(g.gone.size)commit(S.strokes.filter(s=>!g.gone.has(s)));}
     else if(g.k==='cDraw'){
       const C=S.compass,sw=g.hi-g.lo;
@@ -689,28 +735,65 @@ function endGesture(cancelled){
 }
 function eraseAt(p){
   let hit=false;
-  for(const s of S.strokes){if(G.gone.has(s))continue;if(distToStroke(p,s)<=ERASE_R+s.w/2){G.gone.add(s);hit=true;}}
+  for(const s of S.strokes){if(G.gone.has(s))continue;if(distToStroke(p,s)<=tol(ERASE_R)+s.w/2){G.gone.add(s);hit=true;}}
   if(hit)drawInk(G.gone);
 }
-function eraseAlong(a,b){const n=Math.max(1,Math.ceil(dist(a,b)/4));for(let i=1;i<=n;i++)eraseAt(add(a,mul(sub(b,a),i/n)));}
+function eraseAlong(a,b){const n=Math.max(1,Math.ceil(dist(a,b)/tol(4)));for(let i=1;i<=n;i++)eraseAt(add(a,mul(sub(b,a),i/n)));}
+
+// fingers: two fingers zoom and move the page; touches are ignored while the S Pen is busy or near
+const touches=new Map();let pinch=null,penSeen=-1e9;
+function startPinch(){
+  const [a,b]=[...touches.values()];
+  pinch={z0:V.z,x0:V.x,y0:V.y,m0:mid(a,b),d0:Math.max(10,dist(a,b))};
+}
+function movePinch(){
+  const [a,b]=[...touches.values()],m=mid(a,b),d=Math.max(10,dist(a,b));
+  const z=clamp(pinch.z0*d/pinch.d0,ZMIN,ZMAX),w=[(pinch.m0[0]-pinch.x0)/pinch.z0,(pinch.m0[1]-pinch.y0)/pinch.z0];
+  V.z=z;V.x=m[0]-w[0]*z;V.y=m[1]-w[1]*z;requestView();
+}
+function touchDown(e){         // true when the finger is used for zooming or ignored
+  if(e.pointerType!=='touch')return false;
+  if((G&&G.ptype==='pen')||performance.now()-penSeen<600)return true;
+  touches.set(e.pointerId,screenPt(e));
+  try{liveC.setPointerCapture(e.pointerId);}catch(_){}
+  if(touches.size>=2){
+    if(G&&G.ptype==='touch')endGesture(true);
+    startPinch();return true;
+  }
+  return !S.allowFinger;
+}
+function touchUp(e){
+  if(!touches.has(e.pointerId))return;
+  touches.delete(e.pointerId);
+  if(touches.size>=2)startPinch();else pinch=null;
+}
 
 liveC.addEventListener('pointerdown',e=>{
+  rect=stage.getBoundingClientRect();
+  if(e.pointerType==='pen')penSeen=performance.now();
+  if(touchDown(e)){e.preventDefault();return;}
   if(!accept(e)||G)return;
   e.preventDefault();closePops();
-  rect=stage.getBoundingClientRect();
   const p=pt(e),id=e.pointerId;
   try{liveC.setPointerCapture(id);}catch(_){}
   hover=null;
+  if(e.pointerType==='mouse'&&e.button===1){G={k:'pan',id,ptype:'mouse',s0:screenPt(e),x0:V.x,y0:V.y};return;}
   const sideButton=e.button===2||e.button===5||(e.buttons&2)||(e.buttons&32);
-  if(sideButton){G={k:'erase',id,gone:new Set(),last:p};eraseAt(p);requestLive();return;}
+  if(sideButton){G={k:'erase',id,ptype:e.pointerType,gone:new Set(),last:p};eraseAt(p);requestLive();return;}
   const h=toolHit(p);
   if(h)startTool(h,p,id);
   else if(S.mode==='eraser'){G={k:'erase',id,gone:new Set(),last:p};eraseAt(p);}
   else if(S.mode==='line'){const sn=snapPoint(p);G={k:'line',id,s:{t:'line',a:sn.p,b:sn.p,c:S.color,w:S.width},snapA:sn.hit?sn.p:null};}
-  else G={k:'pen',id,s:{t:'pen',p:[[Math.round(p[0]*10)/10,Math.round(p[1]*10)/10]],c:S.color,w:S.width}};
+  else G={k:'pen',id,s:{t:'pen',p:[[Math.round(p[0]*100)/100,Math.round(p[1]*100)/100]],c:S.color,w:S.width}};
+  if(G&&!G.ptype)G.ptype=e.pointerType;
   requestLive();
 });
 liveC.addEventListener('pointermove',e=>{
+  if(e.pointerType==='pen')penSeen=performance.now();
+  if(touches.has(e.pointerId)){
+    touches.set(e.pointerId,screenPt(e));
+    if(pinch&&touches.size>=2){movePinch();return;}
+  }
   if(!accept(e))return;
   const p=pt(e);
   if(G){if(e.pointerId===G.id)moveGesture(e,p);return;}
@@ -718,8 +801,12 @@ liveC.addEventListener('pointermove',e=>{
   liveC.style.cursor=hover?(hover.zone.startsWith('edge')?'crosshair':'grab'):(S.mode==='eraser'?'cell':'crosshair');
   requestLive();
 });
-liveC.addEventListener('pointerup',e=>{if(G&&e.pointerId===G.id)endGesture(false);});
-liveC.addEventListener('pointercancel',e=>{if(G&&e.pointerId===G.id)endGesture(true);});
+liveC.addEventListener('pointerup',e=>{touchUp(e);if(G&&e.pointerId===G.id)endGesture(false);});
+liveC.addEventListener('pointercancel',e=>{touchUp(e);if(G&&e.pointerId===G.id)endGesture(true);});
+liveC.addEventListener('wheel',e=>{
+  e.preventDefault();rect=stage.getBoundingClientRect();
+  zoomAt(screenPt(e),Math.exp(-e.deltaY*0.0015));
+},{passive:false});
 liveC.addEventListener('pointerleave',()=>{if(!G){hover=null;hoverPt=null;requestLive();}});
 liveC.addEventListener('contextmenu',e=>e.preventDefault());
 
@@ -729,7 +816,7 @@ function save(){
   save.t=setTimeout(()=>{
     try{localStorage.setItem(STORE,JSON.stringify({v:1,strokes:S.strokes,mode:S.mode,color:S.color,width:S.width,bg:S.bg,
       allowFinger:S.allowFinger,exportWhite:S.exportWhite,recent:S.recent,show:S.show,order:S.order,
-      compass:S.compass,ruler:S.ruler,protractor:S.protractor}));}catch(_){}
+      compass:S.compass,ruler:S.ruler,protractor:S.protractor,view:S.view}));}catch(_){}
   },300);
 }
 const isPt=p=>Array.isArray(p)&&p.length===2&&isFinite(p[0])&&isFinite(p[1]);
@@ -754,7 +841,9 @@ function load(){
   if(Array.isArray(d.order)&&d.order.length===3&&['compass','ruler','protractor'].every(t=>d.order.includes(t)))S.order=d.order;
   if(d.compass&&isPt(d.compass.c1)&&isFinite(d.compass.r)&&isFinite(d.compass.th))S.compass={c1:d.compass.c1,r:clamp(d.compass.r,R_MIN,R_MAX),th:d.compass.th,locked:!!d.compass.locked};
   if(d.ruler&&isPt(d.ruler.o)&&isFinite(d.ruler.ang))S.ruler={o:d.ruler.o,ang:d.ruler.ang,stuck:d.ruler.stuck&&isPt(d.ruler.stuck.p)?d.ruler.stuck:null};
-  if(d.protractor&&isPt(d.protractor.o)&&isFinite(d.protractor.ang))S.protractor={o:d.protractor.o,ang:d.protractor.ang};
+  if(d.protractor&&isPt(d.protractor.o)&&isFinite(d.protractor.ang))
+    S.protractor={o:d.protractor.o,ang:d.protractor.ang,r:clamp(isFinite(d.protractor.r)?d.protractor.r:PRO_R,PRO_MIN,PRO_MAX)};
+  if(d.view&&isFinite(d.view.z)&&isFinite(d.view.x)&&isFinite(d.view.y)){V.z=clamp(d.view.z,ZMIN,ZMAX);V.x=d.view.x;V.y=d.view.y;}
 }
 
 // ---------- export ----------
@@ -810,8 +899,13 @@ function syncUI(){
   $('inkDot').style.background=S.color;
   $('undo').disabled=!S.past.length;$('redo').disabled=!S.future.length;
   $('fingerOpt').checked=S.allowFinger;
-  buildSwatches();buildWidths();
+  buildSwatches();buildWidths();syncZoom();
 }
+function syncZoom(){
+  $('zoomReset').textContent=Math.round(V.z*100)+'%';
+  $('proBar').hidden=!S.show.protractor;
+}
+function resizePro(d){if(!S.protractor)return;S.protractor.r=clamp(S.protractor.r+d,PRO_MIN,PRO_MAX);save();requestLive();}
 function setColour(c,remember){
   S.color=c;
   if(remember&&!PALETTE.includes(c)){S.recent=[c].concat(S.recent.filter(r=>r!==c)).slice(0,4);}
@@ -865,6 +959,11 @@ $('picker').addEventListener('input',e=>setColour(e.target.value,false));
 $('picker').addEventListener('change',e=>{setColour(e.target.value,true);closePops();});
 $('undo').addEventListener('click',undo);
 $('redo').addEventListener('click',redo);
+$('zoomIn').addEventListener('click',()=>zoomAt([W/2,H/2],1.25));
+$('zoomOut').addEventListener('click',()=>zoomAt([W/2,H/2],0.8));
+$('zoomReset').addEventListener('click',()=>{V.z=1;V.x=0;V.y=0;requestView();});
+$('proSmall').addEventListener('click',()=>resizePro(-PRO_STEP));
+$('proBig').addEventListener('click',()=>resizePro(PRO_STEP));
 $('clearBtn').addEventListener('click',()=>{
   if(!S.strokes.length){toast('Nothing to clear');return;}
   commit([]);toast('Cleared. Undo brings it back.');
@@ -907,8 +1006,8 @@ for(const t of ['compass','ruler','protractor'])if(S.show[t])placeTool(t,false);
 syncUI();requestLive();
 
 // test hook
-window.__C={S,cGeo,rGeo,pGeo,snapData,toolHit,undo,redo,exportCanvas,strokeBounds,get G(){return G;},size:()=>({W,H}),
-  reset(){S.strokes=[];S.past=[];S.future=[];for(const t of ['compass','ruler','protractor'])placeTool(t,true);changed();}};
+window.__C={S,V,cGeo,rGeo,pGeo,snapData,toolHit,undo,redo,exportCanvas,strokeBounds,zoomAt,toScreen,toWorld,get G(){return G;},size:()=>({W,H}),
+  reset(){V.z=1;V.x=0;V.y=0;S.strokes=[];S.past=[];S.future=[];for(const t of ['compass','ruler','protractor'])placeTool(t,true);changed();requestView();}};
 })();
 </script>
 </body>
