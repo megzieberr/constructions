@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="theme-color" content="#1E2A44">
 <title>Constructions</title>
+<link rel="manifest" href="./manifest.json">
+<link rel="icon" type="image/png" href="./icons/icon-192.png">
+<link rel="apple-touch-icon" href="./icons/icon-192.png">
 <style>
 :root{
   --tin:#1E2A44;--tin-2:#2B3B60;--cream:#F6F1E4;--pencil:#F2B33D;--snap:#E8572A;--paper:#FFFFFF;
@@ -23,6 +26,10 @@ html,body{margin:0;height:100%;overflow:hidden;background:var(--paper);color:var
 .tb[aria-pressed="true"]{background:var(--pencil);color:var(--tin)}
 .tb:disabled{opacity:.3;cursor:default;background:transparent}
 .tb:focus-visible,.pill:focus-visible,.seg button:focus-visible{outline:3px solid var(--pencil);outline-offset:2px}
+.tb-label{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;height:62px}
+.tb-label svg{width:24px;height:24px}
+.tb-label span{font:700 11px/1 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;letter-spacing:.02em}
+@media (max-height:760px){.tb{width:52px;height:50px}.tb svg{width:27px;height:27px}.tb-label{height:56px}.tb-label svg{width:22px;height:22px}.sep{margin:3px 0}}
 .ink-dot{width:30px;height:30px;border-radius:50%;border:3px solid var(--cream);display:block}
 .sep{flex:none;width:40px;height:1px;background:rgba(246,241,228,.18);margin:5px 0}
 #stage{position:relative;flex:1;overflow:hidden;background:var(--paper)}
@@ -91,6 +98,9 @@ html,body{margin:0;height:100%;overflow:hidden;background:var(--paper);color:var
       <svg viewBox="0 0 24 24"><path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg></button>
     <button class="tb" id="redo" title="Redo" aria-label="Redo">
       <svg viewBox="0 0 24 24"><path d="M15 14l5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/></svg></button>
+    <div class="sep"></div>
+    <button class="tb tb-label" id="clearBtn" title="Clear everything (undo brings it back)" aria-label="Clear everything">
+      <svg viewBox="0 0 24 24"><path d="M4 7h16"/><path d="M10 11v6M14 11v6"/><path d="M5.5 7l1 13h11l1-13"/><path d="M9 7V4h6v3"/></svg><span>Clear</span></button>
   </nav>
 
   <main id="stage">
@@ -98,13 +108,12 @@ html,body{margin:0;height:100%;overflow:hidden;background:var(--paper);color:var
     <canvas id="ink"></canvas>
     <canvas id="live"></canvas>
     <div id="topbar">
+      <button class="pill" id="installBtn" hidden><svg viewBox="0 0 24 24"><rect x="6" y="2.5" width="12" height="19" rx="2.5"/><path d="M12 7v7"/><path d="M9 11l3 3 3-3"/></svg>Install</button>
       <div class="seg" role="group" aria-label="Background">
         <button data-bg="grid">Grid</button>
         <button data-bg="plain">Plain</button>
       </div>
       <button class="pill" id="saveBtn"><svg viewBox="0 0 24 24"><path d="M12 4v11"/><path d="M7 10l5 5 5-5"/><path d="M5 20h14"/></svg>Save picture</button>
-      <button class="pill round" id="clearBtn" title="Clear everything (undo brings it back)" aria-label="Clear everything">
-        <svg viewBox="0 0 24 24"><path d="M4 7h16"/><path d="M10 11v6M14 11v6"/><path d="M5.5 7l1 13h11l1-13"/><path d="M9 7V4h6v3"/></svg></button>
       <button class="pill round" id="helpBtn" title="How the tools work" aria-label="Help">?</button>
     </div>
     <div id="toast" role="status" aria-live="polite"></div>
@@ -877,6 +886,18 @@ try{
   const f=new File([''],'a.png',{type:'image/png'});
   if(navigator.canShare&&navigator.canShare({files:[f]}))$('doShare').hidden=false;
 }catch(_){}
+
+// ---------- installable app ----------
+let installEv=null;
+window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();installEv=e;$('installBtn').hidden=false;});
+window.addEventListener('appinstalled',()=>{installEv=null;$('installBtn').hidden=true;toast('Installed. It is on your home screen now.');});
+$('installBtn').addEventListener('click',async()=>{
+  const ev=installEv;if(!ev)return;installEv=null;$('installBtn').hidden=true;
+  try{ev.prompt();await ev.userChoice;}catch(_){}
+});
+if('serviceWorker' in navigator&&location.protocol.startsWith('http')){
+  window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));
+}
 
 // ---------- start ----------
 load();
