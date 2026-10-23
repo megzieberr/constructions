@@ -1,0 +1,894 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#1E2A44">
+<title>Constructions</title>
+<style>
+:root{
+  --tin:#1E2A44;--tin-2:#2B3B60;--cream:#F6F1E4;--pencil:#F2B33D;--snap:#E8572A;--paper:#FFFFFF;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0;height:100%;overflow:hidden;background:var(--paper);color:var(--tin);
+  font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;overscroll-behavior:none}
+#app{position:fixed;inset:0;display:flex}
+#bar{flex:none;width:76px;background:var(--tin);display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 0;overflow-y:auto;scrollbar-width:none;z-index:6}
+#bar::-webkit-scrollbar{display:none}
+.tb{flex:none;width:56px;height:56px;border:0;border-radius:16px;background:transparent;color:var(--cream);display:grid;place-items:center;cursor:pointer;padding:0;-webkit-tap-highlight-color:transparent}
+.tb svg{width:30px;height:30px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.tb:hover{background:var(--tin-2)}
+.tb[aria-pressed="true"]{background:var(--pencil);color:var(--tin)}
+.tb:disabled{opacity:.3;cursor:default;background:transparent}
+.tb:focus-visible,.pill:focus-visible,.seg button:focus-visible{outline:3px solid var(--pencil);outline-offset:2px}
+.ink-dot{width:30px;height:30px;border-radius:50%;border:3px solid var(--cream);display:block}
+.sep{flex:none;width:40px;height:1px;background:rgba(246,241,228,.18);margin:5px 0}
+#stage{position:relative;flex:1;overflow:hidden;background:var(--paper)}
+#stage canvas{position:absolute;left:0;top:0;display:block}
+#topbar{position:absolute;top:12px;right:12px;display:flex;gap:8px;z-index:5;align-items:center}
+.pill{height:46px;padding:0 16px;border:0;border-radius:23px;background:var(--tin);color:var(--cream);font:600 15px/1 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;display:flex;align-items:center;gap:8px;cursor:pointer;box-shadow:0 2px 10px rgba(30,42,68,.18);-webkit-tap-highlight-color:transparent}
+.pill svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.pill.round{width:46px;padding:0;justify-content:center}
+.seg{display:flex;background:var(--tin);border-radius:23px;padding:4px;gap:2px;box-shadow:0 2px 10px rgba(30,42,68,.18)}
+.seg button{height:38px;padding:0 14px;border:0;border-radius:19px;background:transparent;color:var(--cream);font:600 14px/1 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--pencil);color:var(--tin)}
+.seg.light{background:#EEF1F6;box-shadow:none}
+.seg.light button{color:var(--tin)}
+.pop{position:fixed;z-index:20;background:#fff;border-radius:18px;box-shadow:0 8px 30px rgba(30,42,68,.25);padding:14px 16px;display:none;max-width:calc(100vw - 24px)}
+.pop.open{display:block}
+.pop h3{margin:2px 0 10px;font-size:14px;font-weight:700;color:var(--tin)}
+.pop h3.later{margin-top:14px}
+.swatches{display:grid;grid-template-columns:repeat(4,44px);gap:10px}
+.sw{width:44px;height:44px;border-radius:50%;border:3px solid #fff;box-shadow:0 0 0 1px rgba(30,42,68,.2);cursor:pointer;padding:0}
+.sw[aria-pressed="true"]{box-shadow:0 0 0 3px var(--tin)}
+.custom{margin-top:12px;display:flex;align-items:center;gap:10px;height:44px;padding:0 14px;border-radius:22px;background:#EEF1F6;font-weight:600;font-size:14px;cursor:pointer;position:relative;overflow:hidden}
+.custom input{position:absolute;inset:0;opacity:0;width:100%;height:100%;cursor:pointer;border:0;padding:0}
+.widths{display:flex;flex-direction:column;gap:8px}
+.wbtn{width:180px;height:44px;border:0;border-radius:12px;background:#EEF1F6;display:flex;align-items:center;gap:12px;padding:0 14px;cursor:pointer;font:600 14px system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--tin)}
+.wbtn[aria-pressed="true"]{background:var(--pencil)}
+.wbtn i{display:block;flex:1;border-radius:4px}
+.hint{font-size:13px;line-height:1.4;color:#4A5570;margin:10px 0 12px;max-width:290px}
+.row{display:flex;gap:8px}
+.pill.ghost{background:#EEF1F6;color:var(--tin);box-shadow:none}
+#toast{position:absolute;left:50%;bottom:22px;transform:translateX(-50%);background:var(--tin);color:var(--cream);padding:12px 18px;border-radius:22px;font-weight:600;font-size:15px;opacity:0;pointer-events:none;transition:opacity .2s;z-index:7;white-space:nowrap}
+#toast.show{opacity:1}
+#help{position:fixed;inset:0;background:rgba(30,42,68,.45);z-index:30;display:none;align-items:center;justify-content:center;padding:16px}
+#help.open{display:flex}
+#help .card{background:#fff;border-radius:22px;max-width:640px;width:100%;max-height:100%;overflow:auto;padding:22px 24px;touch-action:pan-y}
+#help h2{margin:0 0 4px;font-size:22px}
+#help h4{margin:16px 0 6px;font-size:15px;color:var(--tin)}
+#help ul{margin:0;padding-left:20px;line-height:1.5;font-size:15px;color:#2E3A55}
+#help .set{margin-top:18px;padding:14px;border-radius:14px;background:#EEF1F6;display:flex;gap:12px;align-items:center;font-weight:600}
+#help .set input{width:24px;height:24px}
+#help .close{margin-top:18px}
+@media (prefers-reduced-motion:reduce){#toast{transition:none}}
+</style>
+</head>
+<body>
+<div id="app">
+  <nav id="bar" aria-label="Tools">
+    <button class="tb" data-mode="pen" title="Pen: write and label freehand" aria-label="Pen">
+      <svg viewBox="0 0 24 24"><path d="M4 20l1.2-4.6L15.6 5a2 2 0 0 1 2.8 0l.6.6a2 2 0 0 1 0 2.8L8.6 18.8z"/><path d="M14 6.6l3.4 3.4"/></svg></button>
+    <button class="tb" data-mode="line" title="Straight line without the ruler" aria-label="Straight line">
+      <svg viewBox="0 0 24 24"><path d="M5 19L19 5"/><circle cx="5" cy="19" r="2" fill="currentColor"/><circle cx="19" cy="5" r="2" fill="currentColor"/></svg></button>
+    <button class="tb" data-mode="eraser" title="Eraser: touch a line to remove it" aria-label="Eraser">
+      <svg viewBox="0 0 24 24"><path d="M8.5 19.5L3.8 14.8a1.8 1.8 0 0 1 0-2.6l8.4-8.4a1.8 1.8 0 0 1 2.6 0l5 5a1.8 1.8 0 0 1 0 2.6l-8 8"/><path d="M8.5 19.5H20"/><path d="M7.5 9.5l7 7"/></svg></button>
+    <div class="sep"></div>
+    <button class="tb" id="colourBtn" title="Ink colour" aria-label="Ink colour"><span class="ink-dot" id="inkDot"></span></button>
+    <button class="tb" id="widthBtn" title="Line thickness" aria-label="Line thickness">
+      <svg viewBox="0 0 24 24"><path d="M4 6h16" stroke-width="1.2"/><path d="M4 12h16" stroke-width="2.4"/><path d="M4 18.5h16" stroke-width="4"/></svg></button>
+    <div class="sep"></div>
+    <button class="tb" data-tool="compass" title="Compass" aria-label="Compass">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="4.6" r="1.7"/><path d="M12 2v1"/><path d="M11.2 6.2L6 21"/><path d="M12.8 6.2L18 21"/><path d="M8.3 15.5c2.4 1.2 5 1.2 7.4 0"/></svg></button>
+    <button class="tb" data-tool="ruler" title="Ruler" aria-label="Ruler">
+      <svg viewBox="0 0 24 24"><rect x="2.5" y="8" width="19" height="8" rx="1.5"/><path d="M6 8v3M9 8v2M12 8v3M15 8v2M18 8v3"/></svg></button>
+    <button class="tb" data-tool="protractor" title="Protractor" aria-label="Protractor">
+      <svg viewBox="0 0 24 24"><path d="M3 17a9 9 0 0 1 18 0z"/><path d="M12 17l4.5-6"/><path d="M7 13.4l1 .8M12 10v1.3M17 13.4l-1 .8"/></svg></button>
+    <div class="sep"></div>
+    <button class="tb" id="undo" title="Undo" aria-label="Undo">
+      <svg viewBox="0 0 24 24"><path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg></button>
+    <button class="tb" id="redo" title="Redo" aria-label="Redo">
+      <svg viewBox="0 0 24 24"><path d="M15 14l5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/></svg></button>
+  </nav>
+
+  <main id="stage">
+    <canvas id="bg"></canvas>
+    <canvas id="ink"></canvas>
+    <canvas id="live"></canvas>
+    <div id="topbar">
+      <div class="seg" role="group" aria-label="Background">
+        <button data-bg="grid">Grid</button>
+        <button data-bg="plain">Plain</button>
+      </div>
+      <button class="pill" id="saveBtn"><svg viewBox="0 0 24 24"><path d="M12 4v11"/><path d="M7 10l5 5 5-5"/><path d="M5 20h14"/></svg>Save picture</button>
+      <button class="pill round" id="clearBtn" title="Clear everything (undo brings it back)" aria-label="Clear everything">
+        <svg viewBox="0 0 24 24"><path d="M4 7h16"/><path d="M10 11v6M14 11v6"/><path d="M5.5 7l1 13h11l1-13"/><path d="M9 7V4h6v3"/></svg></button>
+      <button class="pill round" id="helpBtn" title="How the tools work" aria-label="Help">?</button>
+    </div>
+    <div id="toast" role="status" aria-live="polite"></div>
+  </main>
+</div>
+
+<div class="pop" id="colourPop">
+  <h3>Ink colour</h3>
+  <div class="swatches" id="swatches"></div>
+  <h3 class="later" id="recentTitle">Your colours</h3>
+  <div class="swatches" id="recent"></div>
+  <label class="custom">+ Pick any colour<input type="color" id="picker" value="#1F5FD1"></label>
+</div>
+
+<div class="pop" id="widthPop">
+  <h3>Thickness</h3>
+  <div class="widths" id="widths"></div>
+</div>
+
+<div class="pop" id="savePop">
+  <h3>Save picture</h3>
+  <div class="seg light" role="group" aria-label="Picture background">
+    <button data-bgx="clear">See-through</button>
+    <button data-bgx="white">White</button>
+  </div>
+  <p class="hint">Only your drawing is saved, cropped neatly, at 3× size so it stays sharp in Word and on paper. The grid and the tools are left out. If an app shows the picture on black, save it with White.</p>
+  <div class="row">
+    <button class="pill" id="doSave">Save</button>
+    <button class="pill ghost" id="doShare" hidden>Share</button>
+  </div>
+</div>
+
+<div id="help" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
+  <div class="card">
+    <h2 id="helpTitle">How the tools work</h2>
+    <h4>Compass</h4>
+    <ul>
+      <li>Drag the <b>top handle</b> to swing it and draw an arc. Swing all the way round for a circle.</li>
+      <li>Drag the <b>needle arm</b> to move the whole compass. The needle clicks onto points and crossings.</li>
+      <li>Drag the <b>pencil arm</b> to open or close it. It clicks onto points too, so you can copy a length.</li>
+      <li>Tap the <b>lock</b> to keep the width. Then the pencil arm only turns it.</li>
+    </ul>
+    <h4>Ruler</h4>
+    <ul>
+      <li>Drag the <b>middle</b> to move it. Its edge clicks onto points; an orange ring shows where it is stuck.</li>
+      <li>Turn it with a <b>round knob</b>. It turns around the point it is stuck on and clicks onto the next point.</li>
+      <li>Start your pen <b>on an edge</b> to draw along it. The label shows the length.</li>
+    </ul>
+    <h4>Pen, line and eraser</h4>
+    <ul>
+      <li><b>Line</b> draws a straight line without the ruler. Its ends click onto points.</li>
+      <li><b>Eraser</b>: touch or rub across a line and the whole line goes. Holding the S Pen button may erase too.</li>
+      <li>Undo and redo go one step at a time. Clear can be undone as well.</li>
+    </ul>
+    <label class="set"><input type="checkbox" id="fingerOpt"> Let my finger draw too (normally only the S Pen and the mouse draw)</label>
+    <button class="pill close" id="helpClose">Got it</button>
+  </div>
+</div>
+
+<script>
+(function(){
+'use strict';
+
+// ---------- constants ----------
+const PI=Math.PI, TAU=2*PI;
+const CM=32, MM=CM/10;               // 1 cm = 32 screen px (grid, ruler and labels agree)
+const SNAP_PT=16, SNAP_CURVE=9, STICK=14, ERASE_R=10;
+const PALETTE=['#1F2328','#8A8F98','#1F5FD1','#D7263D','#2E9E4F','#C2189B','#7B3FC4','#F07A10'];
+const WIDTHS=[{w:2,label:'Thin'},{w:3.5,label:'Medium'},{w:6,label:'Thick'}];
+const COMPASS_L=240, R_MAX=1.85*COMPASS_L, R_MIN=6, HANDLE=56;
+const RULER_LEN=30*CM, RULER_W=72, RULER_PAD=14, KNOB_R=17, KNOB_OFF=28;
+const PRO_R=170;
+const STORE='constructions.v1';
+
+// ---------- geometry ----------
+const add=(a,b)=>[a[0]+b[0],a[1]+b[1]];
+const sub=(a,b)=>[a[0]-b[0],a[1]-b[1]];
+const mul=(a,k)=>[a[0]*k,a[1]*k];
+const dot=(a,b)=>a[0]*b[0]+a[1]*b[1];
+const cross=(a,b)=>a[0]*b[1]-a[1]*b[0];
+const dist=(a,b)=>Math.hypot(a[0]-b[0],a[1]-b[1]);
+const mid=(a,b)=>[(a[0]+b[0])/2,(a[1]+b[1])/2];
+const dirOf=t=>[Math.cos(t),Math.sin(t)];
+const unit=a=>{const l=Math.hypot(a[0],a[1])||1;return [a[0]/l,a[1]/l];};
+const normAng=a=>{a%=TAU;return a<0?a+TAU:a;};
+const wrapPi=a=>normAng(a+PI)-PI;
+const clamp=(v,lo,hi)=>Math.max(lo,Math.min(hi,v));
+function closestOnSeg(p,a,b){const ab=sub(b,a),L2=dot(ab,ab);if(L2<1e-12)return a.slice();const t=clamp(dot(sub(p,a),ab)/L2,0,1);return add(a,mul(ab,t));}
+const distToSeg=(p,a,b)=>dist(p,closestOnSeg(p,a,b));
+function sweep(a,b,o){const u=sub(a,o),v=sub(b,o);return Math.atan2(cross(u,v),dot(u,v));}
+const isFull=s=>s.sw>=TAU-1e-6;
+const onArc=(ang,s)=>isFull(s)||normAng(ang-s.a0)<=s.sw+1e-6;
+const angAt=(s,p)=>Math.atan2(p[1]-s.o[1],p[0]-s.o[0]);
+function arcEnds(s){return [add(s.o,mul(dirOf(s.a0),s.r)),add(s.o,mul(dirOf(s.a0+s.sw),s.r))];}
+function distToStroke(p,s){
+  if(s.t==='line')return distToSeg(p,s.a,s.b);
+  if(s.t==='arc'){
+    if(onArc(angAt(s,p),s))return Math.abs(dist(p,s.o)-s.r);
+    const e=arcEnds(s);return Math.min(dist(p,e[0]),dist(p,e[1]));
+  }
+  const P=s.p;if(P.length===1)return dist(p,P[0]);
+  let m=Infinity;for(let i=1;i<P.length;i++)m=Math.min(m,distToSeg(p,P[i-1],P[i]));return m;
+}
+function nearestOnCurve(p,s){
+  if(s.t==='line')return closestOnSeg(p,s.a,s.b);
+  const v=sub(p,s.o),d=Math.hypot(v[0],v[1]);
+  if(d<1e-9||!onArc(Math.atan2(v[1],v[0]),s))return null;
+  return add(s.o,mul(v,s.r/d));
+}
+function segSeg(a,b,c,d){
+  const r=sub(b,a),s=sub(d,c),den=cross(r,s);if(Math.abs(den)<1e-9)return [];
+  const ca=sub(c,a),t=cross(ca,s)/den,u=cross(ca,r)/den,e=1e-7;
+  return (t>=-e&&t<=1+e&&u>=-e&&u<=1+e)?[add(a,mul(r,t))]:[];
+}
+function segCirc(a,b,o,r){
+  const d=sub(b,a),f=sub(a,o),A=dot(d,d),B=2*dot(f,d),C=dot(f,f)-r*r;if(A<1e-12)return [];
+  let disc=B*B-4*A*C;if(disc<0)return [];disc=Math.sqrt(disc);
+  const out=[];for(const t of [(-B-disc)/(2*A),(-B+disc)/(2*A)])if(t>=-1e-7&&t<=1+1e-7)out.push(add(a,mul(d,t)));
+  return out;
+}
+function circCirc(o1,r1,o2,r2){
+  const d=dist(o1,o2);if(d<1e-9||d>r1+r2+1e-9||d<Math.abs(r1-r2)-1e-9)return [];
+  const a=(r1*r1-r2*r2+d*d)/(2*d),h=Math.sqrt(Math.max(0,r1*r1-a*a));
+  const e=mul(sub(o2,o1),1/d),p=add(o1,mul(e,a)),q=[-e[1],e[0]];
+  return h<1e-9?[p]:[add(p,mul(q,h)),sub(p,mul(q,h))];
+}
+function intersect(s1,s2){
+  if(s1.t==='line'&&s2.t==='line')return segSeg(s1.a,s1.b,s2.a,s2.b);
+  if(s1.t==='arc'&&s2.t==='line'){const tmp=s1;s1=s2;s2=tmp;}
+  if(s1.t==='line')return segCirc(s1.a,s1.b,s2.o,s2.r).filter(p=>onArc(angAt(s2,p),s2));
+  return circCirc(s1.o,s1.r,s2.o,s2.r).filter(p=>onArc(angAt(s1,p),s1)&&onArc(angAt(s2,p),s2));
+}
+
+// ---------- state ----------
+const S={
+  mode:'pen',color:PALETTE[0],width:3.5,bg:'grid',allowFinger:false,exportWhite:false,recent:[],
+  strokes:[],past:[],future:[],
+  show:{compass:false,ruler:false,protractor:false},
+  order:['protractor','ruler','compass'],
+  compass:null,ruler:null,protractor:null
+};
+let G=null;            // the gesture in progress
+let hover=null,hoverPt=null;
+
+// ---------- snapping ----------
+let snapCache=null;
+function snapData(){
+  if(snapCache)return snapCache;
+  const curves=S.strokes.filter(s=>s.t==='line'||s.t==='arc'),pts=[];
+  const push=p=>{for(const q of pts)if(dist(p,q)<0.75)return;pts.push(p);};
+  for(const s of curves){if(s.t==='line'){push(s.a);push(s.b);}else push(s.o);}
+  for(let i=0;i<curves.length;i++)for(let j=i+1;j<curves.length;j++)for(const p of intersect(curves[i],curves[j]))push(p);
+  return (snapCache={pts,curves});
+}
+function snapPoint(p){
+  const {pts,curves}=snapData();
+  let best=null,bd=SNAP_PT;
+  for(const q of pts){const d=dist(p,q);if(d<bd){bd=d;best=q;}}
+  if(best)return {p:best.slice(),hit:true};
+  bd=SNAP_CURVE;
+  for(const s of curves){const q=nearestOnCurve(p,s);if(q){const d=dist(p,q);if(d<bd){bd=d;best=q;}}}
+  if(best)return {p:best,hit:true};
+  return {p:p.slice(),hit:false};
+}
+// turn snapping shared by ruler and protractor: the edge clicks through a point, else onto 45° steps
+function snapTurn(raw,pivot,lx,minX,maxX,usePoints){
+  if(usePoints){
+    const u=dirOf(raw),n=[-u[1],u[0]];let best=null,bd=10;
+    for(const q of snapData().pts){
+      const v=sub(q,pivot);if(Math.hypot(v[0],v[1])<24)continue;
+      const along=lx+dot(v,u);if(along<minX||along>maxX)continue;
+      const perp=Math.abs(dot(v,n));if(perp<bd){bd=perp;best=q;}
+    }
+    if(best){const v=sub(best,pivot);let a=Math.atan2(v[1],v[0]);if(dot(v,u)<0)a+=PI;return {ang:raw+wrapPi(a-raw),target:best};}
+  }
+  const step=PI/4,k=Math.round(raw/step);
+  if(Math.abs(raw-k*step)<=1.2*PI/180)return {ang:k*step,target:null};
+  return {ang:raw,target:null};
+}
+
+// ---------- history ----------
+function commit(next){
+  S.past.push(S.strokes);if(S.past.length>300)S.past.shift();
+  S.strokes=next;S.future=[];changed();
+}
+const addStroke=s=>commit(S.strokes.concat([s]));
+function undo(){if(!S.past.length||G)return;S.future.push(S.strokes);S.strokes=S.past.pop();changed();}
+function redo(){if(!S.future.length||G)return;S.past.push(S.strokes);S.strokes=S.future.pop();changed();}
+function changed(){
+  snapCache=null;
+  if(S.ruler&&S.ruler.stuck&&!snapData().pts.some(q=>dist(q,S.ruler.stuck.p)<0.75))S.ruler.stuck=null;
+  drawInk();syncUI();save();requestLive();
+}
+
+// ---------- canvases ----------
+const $=id=>document.getElementById(id);
+const stage=$('stage'),bgC=$('bg'),inkC=$('ink'),liveC=$('live');
+const bgX=bgC.getContext('2d'),inkX=inkC.getContext('2d'),liveX=liveC.getContext('2d');
+let W=0,H=0,DPR=1,rect={left:0,top:0};
+function resize(){
+  const r=stage.getBoundingClientRect();W=r.width;H=r.height;DPR=Math.max(1,window.devicePixelRatio||1);rect=r;
+  for(const c of [bgC,inkC,liveC]){
+    c.width=Math.round(W*DPR);c.height=Math.round(H*DPR);c.style.width=W+'px';c.style.height=H+'px';
+    c.getContext('2d').setTransform(DPR,0,0,DPR,0,0);
+  }
+  drawBg();drawInk();drawLive();
+}
+function drawBg(){
+  bgX.save();bgX.setTransform(1,0,0,1,0,0);
+  bgX.fillStyle='#fff';bgX.fillRect(0,0,bgC.width,bgC.height);
+  if(S.bg==='grid'){
+    const step=CM*DPR,lw=Math.max(1,Math.round(DPR*0.9)),off=lw%2?0.5:0;
+    bgX.strokeStyle='#CFDCEC';bgX.lineWidth=lw;bgX.beginPath();
+    for(let x=0;x<=bgC.width;x+=step){const X=Math.round(x)+off;bgX.moveTo(X,0);bgX.lineTo(X,bgC.height);}
+    for(let y=0;y<=bgC.height;y+=step){const Y=Math.round(y)+off;bgX.moveTo(0,Y);bgX.lineTo(bgC.width,Y);}
+    bgX.stroke();
+  }
+  bgX.restore();
+}
+function drawStroke(x,s){
+  x.strokeStyle=s.c;x.fillStyle=s.c;x.lineWidth=s.w;x.lineCap='round';x.lineJoin='round';
+  if(s.t==='line'){x.beginPath();x.moveTo(s.a[0],s.a[1]);x.lineTo(s.b[0],s.b[1]);x.stroke();return;}
+  if(s.t==='arc'){
+    x.beginPath();
+    if(isFull(s))x.arc(s.o[0],s.o[1],s.r,0,TAU);else x.arc(s.o[0],s.o[1],s.r,s.a0,s.a0+s.sw);
+    x.stroke();
+    x.beginPath();x.arc(s.o[0],s.o[1],Math.max(1.6,s.w*0.55),0,TAU);x.fill();   // needle mark
+    return;
+  }
+  const P=s.p;
+  if(P.length<2){x.beginPath();x.arc(P[0][0],P[0][1],s.w*0.75,0,TAU);x.fill();return;}
+  x.beginPath();x.moveTo(P[0][0],P[0][1]);
+  for(let i=1;i<P.length-1;i++){const m=mid(P[i],P[i+1]);x.quadraticCurveTo(P[i][0],P[i][1],m[0],m[1]);}
+  const L=P[P.length-1];x.lineTo(L[0],L[1]);x.stroke();
+}
+function drawInk(hide){inkX.clearRect(0,0,W,H);for(const s of S.strokes)if(!hide||!hide.has(s))drawStroke(inkX,s);}
+
+let livePending=false;
+function requestLive(){if(livePending)return;livePending=true;requestAnimationFrame(flushLive);setTimeout(flushLive,40);}
+function flushLive(){if(!livePending)return;livePending=false;drawLive();}
+
+// ---------- compass ----------
+function cGeo(C){
+  const u=dirOf(C.th),r=C.r,L=COMPASS_L,h=Math.sqrt(Math.max(0,L*L-r*r/4));
+  const a=normAng(C.th),left=a>PI/2&&a<1.5*PI;
+  const up=left?[-u[1],u[0]]:[u[1],-u[0]];          // the hinge always sits on the upper side
+  const W2=(lx,ly)=>add(C.c1,add(mul(u,lx),mul(up,ly)));
+  const c1=C.c1,c3=W2(r,0),m=W2(r/2,0),c2=W2(r/2,h);
+  const half=Math.atan2(r/2,h),pa=half-PI/14;          // pencil sits a little more upright than its arm
+  const pd=add(mul(u,-Math.sin(pa)),mul(up,Math.cos(pa)));
+  const yk=0.3*h,knee=W2(r-(r/2)*(yk/(h||1)),yk),clampP=W2(r-Math.tan(pa)*yk,yk);
+  return {u,up,h,c1,c2,c3,m,lockC:mid(c2,m),hEnd:add(c2,mul(up,HANDLE)),pd,knee,clampP,pTop:add(c3,mul(pd,192)),
+    L1:W2(r/4,h/2),L2:W2(3*r/4,h/2)};
+}
+function hitCompass(p){
+  const g=cGeo(S.compass);
+  if(dist(p,g.lockC)<=26)return 'lock';
+  if(dist(p,g.c2)<=40||distToSeg(p,g.c2,g.hEnd)<=16)return 'draw';
+  if(dist(p,g.c1)<=30||distToSeg(p,g.c1,g.c2)<=20)return 'move';
+  if(dist(p,g.c3)<=30||distToSeg(p,g.c2,g.knee)<=20||distToSeg(p,g.knee,g.clampP)<=16||distToSeg(p,g.c3,g.pTop)<=16)return 'width';
+  return null;
+}
+function capsule(x,a,b,w,fill,edge){
+  x.lineCap='round';x.beginPath();x.moveTo(a[0],a[1]);x.lineTo(b[0],b[1]);
+  x.strokeStyle=edge;x.lineWidth=w+2.5;x.stroke();x.strokeStyle=fill;x.lineWidth=w;x.stroke();
+}
+function halo(x,a,b,w){x.lineCap='round';x.beginPath();x.moveTo(a[0],a[1]);x.lineTo(b[0],b[1]);x.strokeStyle='rgba(242,179,61,.55)';x.lineWidth=w;x.stroke();}
+function poly(x,pts,fill,edge,lw){x.beginPath();x.moveTo(pts[0][0],pts[0][1]);for(let i=1;i<pts.length;i++)x.lineTo(pts[i][0],pts[i][1]);x.closePath();x.fillStyle=fill;x.fill();if(edge){x.strokeStyle=edge;x.lineWidth=lw||1;x.stroke();}}
+function padlock(x,c,locked){
+  const col=locked?'#1E2A44':'#A9B1C2';
+  x.save();x.translate(c[0],c[1]);
+  x.strokeStyle=col;x.lineWidth=1.8;x.beginPath();
+  if(locked)x.arc(0,-2,4,PI,TAU);else x.arc(3,-4,4,PI*1.15,TAU*0.98);
+  x.stroke();x.fillStyle=col;x.fillRect(-5.5,-2,11,8);
+  x.restore();
+}
+function drawPencil(x,g){
+  const pd=g.pd,c3=g.c3,n=[-pd[1],pd[0]],w=6.5;
+  const at=(d,s)=>add(add(c3,mul(pd,d)),mul(n,s));
+  poly(x,[at(24,-w),at(176,-w),at(176,w),at(24,w)],'#F2B33D','#8A5A00',1);
+  x.beginPath();x.moveTo(...at(24,0));x.lineTo(...at(176,0));x.strokeStyle='rgba(138,90,0,.35)';x.lineWidth=1;x.stroke();
+  poly(x,[at(176,-w),at(182,-w),at(182,w),at(176,w)],'#C9CED8','#6B7280',1);
+  poly(x,[at(182,-w),at(192,-w),at(192,w),at(182,w)],'#F29BAA','#8A5A00',1);
+  poly(x,[at(24,-w),at(24,w),at(6,1.8),at(6,-1.8)],'#F3D6A4','#8A5A00',1);
+  poly(x,[at(6,-1.8),at(6,1.8),at(0,0)],S.color,S.color,0.5);
+}
+function drawCompass(x,zone){
+  const C=S.compass,g=cGeo(C),ARM='#8FA3D6',EDGE='#1E2A44';
+  if(zone==='move')halo(x,g.c2,g.c1,32);
+  if(zone==='width'){halo(x,g.c2,g.knee,32);halo(x,g.knee,g.clampP,26);halo(x,g.c3,g.pTop,28);}
+  if(zone==='draw'){halo(x,g.c2,g.hEnd,34);}
+  const locked=C.locked||(G&&G.k==='cDraw');
+  // lock bar and button
+  x.lineCap='butt';x.beginPath();x.moveTo(...g.L1);x.lineTo(...g.L2);
+  x.strokeStyle=locked?EDGE:'#A9B1C2';x.lineWidth=locked?9:6;x.stroke();
+  if(locked){x.strokeStyle=ARM;x.lineWidth=6;x.stroke();}
+  if(zone==='lock'){x.beginPath();x.arc(g.lockC[0],g.lockC[1],22,0,TAU);x.fillStyle='rgba(242,179,61,.55)';x.fill();}
+  x.beginPath();x.arc(g.lockC[0],g.lockC[1],15,0,TAU);x.fillStyle=locked?ARM:'#fff';x.fill();
+  x.lineWidth=2.5;x.strokeStyle=locked?EDGE:'#A9B1C2';x.stroke();
+  padlock(x,g.lockC,locked);
+  // needle arm and needle
+  const na=unit(sub(g.c2,g.c1)),ns=add(g.c1,mul(na,20)),nn=[-na[1],na[0]];
+  capsule(x,g.c2,ns,13,ARM,EDGE);
+  poly(x,[add(ns,mul(nn,3.2)),add(ns,mul(nn,-3.2)),g.c1],'#C9CED8',EDGE,0.8);
+  // pencil and its arm
+  drawPencil(x,g);
+  capsule(x,g.c2,g.knee,13,ARM,EDGE);
+  capsule(x,g.knee,g.clampP,9,ARM,EDGE);
+  x.beginPath();x.arc(g.clampP[0],g.clampP[1],6,0,TAU);x.fillStyle=EDGE;x.fill();
+  // handle and hinge
+  capsule(x,g.c2,g.hEnd,11,'#2A2F3A',EDGE);
+  x.beginPath();x.arc(g.c2[0],g.c2[1],16,0,TAU);x.fillStyle='#2A2F3A';x.fill();x.strokeStyle=EDGE;x.lineWidth=1.5;x.stroke();
+  x.beginPath();x.arc(g.c2[0],g.c2[1],5.5,0,TAU);x.fillStyle='#D9DCE3';x.fill();
+  x.beginPath();x.moveTo(g.c2[0]-3,g.c2[1]-3);x.lineTo(g.c2[0]+3,g.c2[1]+3);x.moveTo(g.c2[0]+3,g.c2[1]-3);x.lineTo(g.c2[0]-3,g.c2[1]+3);
+  x.strokeStyle='#2A2F3A';x.lineWidth=1.2;x.stroke();
+}
+
+// ---------- ruler ----------
+function rGeo(R){
+  const u=dirOf(R.ang),n=[-u[1],u[0]];              // n points from the ticked edge into the ruler
+  const L2W=(lx,ly)=>add(R.o,add(mul(u,lx),mul(n,ly)));
+  return {u,n,L2W,toL:p=>{const v=sub(p,R.o);return [dot(v,u),dot(v,n)];},
+    knobs:[L2W(-RULER_PAD-KNOB_OFF,RULER_W/2),L2W(RULER_LEN+RULER_PAD+KNOB_OFF,RULER_W/2)],
+    centre:L2W(RULER_LEN/2,RULER_W/2)};
+}
+function hitRuler(p){
+  const g=rGeo(S.ruler);
+  if(dist(p,g.knobs[0])<=KNOB_R+9)return 'turnL';
+  if(dist(p,g.knobs[1])<=KNOB_R+9)return 'turnR';
+  const [x,y]=g.toL(p);
+  if(x<-RULER_PAD||x>RULER_LEN+RULER_PAD)return null;
+  if(S.mode!=='eraser'){
+    if(y>=-26&&y<=14)return 'edgeA';
+    if(y>=RULER_W-14&&y<=RULER_W+26)return 'edgeB';
+  }
+  if(y>=0&&y<=RULER_W)return 'move';
+  return null;
+}
+function stickRuler(){
+  const R=S.ruler,g=rGeo(R);let best=null,bd=STICK;
+  for(const q of snapData().pts){
+    const [x,y]=g.toL(q);if(x<-RULER_PAD||x>RULER_LEN+RULER_PAD)continue;
+    for(const [edge,ey] of [['A',0],['B',RULER_W]]){const d=y-ey;if(Math.abs(d)<bd){bd=Math.abs(d);best={q,edge,d};}}
+  }
+  if(best){R.o=add(R.o,mul(g.n,best.d));R.stuck={p:best.q.slice(),edge:best.edge};}else R.stuck=null;
+}
+function edgeTargets(base,u,n){
+  const xs=[],a=add(base,mul(u,-RULER_PAD)),b=add(base,mul(u,RULER_LEN+RULER_PAD));
+  const {pts,curves}=snapData();
+  for(const q of pts){const v=sub(q,base);if(Math.abs(dot(v,n))<=2.5)xs.push(dot(v,u));}
+  const edge={t:'line',a,b};
+  for(const s of curves)for(const q of intersect(edge,s))xs.push(dot(sub(q,base),u));
+  return xs;
+}
+function snapEdgeX(x,targets,from){
+  let best=null,bd=14;
+  for(const t of targets){const d=Math.abs(t-x);if(d<bd){bd=d;best=t;}}
+  if(best!==null)return {x:clamp(best,-RULER_PAD,RULER_LEN+RULER_PAD),hit:true};
+  const v=from===undefined?Math.round(x/MM)*MM:from+Math.round((x-from)/MM)*MM;
+  return {x:clamp(v,0,RULER_LEN),hit:false};
+}
+function drawRuler(x,zone){
+  const R=S.ruler;
+  x.save();x.translate(R.o[0],R.o[1]);x.rotate(R.ang);
+  for(const [side,kx] of [['turnL',-RULER_PAD-KNOB_OFF],['turnR',RULER_LEN+RULER_PAD+KNOB_OFF]]){
+    const ex=side==='turnL'?-RULER_PAD:RULER_LEN+RULER_PAD;
+    x.fillStyle='rgba(59,111,182,.55)';x.fillRect(Math.min(kx,ex),RULER_W/2-4,Math.abs(ex-kx),8);
+    if(zone===side){x.beginPath();x.arc(kx,RULER_W/2,KNOB_R+8,0,TAU);x.fillStyle='rgba(242,179,61,.55)';x.fill();}
+    x.beginPath();x.arc(kx,RULER_W/2,KNOB_R,0,TAU);x.fillStyle='#3B6FB6';x.fill();
+    x.strokeStyle='#fff';x.lineWidth=2;x.lineCap='round';
+    x.beginPath();x.arc(kx,RULER_W/2,8,-PI*0.15,PI*1.25);x.stroke();
+    const ae=[kx+8*Math.cos(PI*1.25),RULER_W/2+8*Math.sin(PI*1.25)];
+    x.beginPath();x.moveTo(ae[0]-4.5,ae[1]+0.5);x.lineTo(ae[0],ae[1]);x.lineTo(ae[0]+0.5,ae[1]+4.5);x.stroke();
+  }
+  x.beginPath();rr(x,-RULER_PAD,0,RULER_LEN+2*RULER_PAD,RULER_W,7);
+  x.fillStyle='rgba(158,196,240,.34)';x.fill();x.strokeStyle='rgba(59,111,182,.95)';x.lineWidth=1.2;x.stroke();
+  if(zone==='edgeA'||zone==='edgeB'){
+    const y=zone==='edgeA'?0:RULER_W;x.beginPath();x.moveTo(-RULER_PAD,y);x.lineTo(RULER_LEN+RULER_PAD,y);
+    x.strokeStyle='rgba(242,179,61,.9)';x.lineWidth=5;x.lineCap='round';x.stroke();
+  }
+  x.strokeStyle='#1E2A44';x.lineCap='butt';
+  for(let i=0;i<=300;i++){
+    const tx=i*MM,len=i%10===0?16:i%5===0?11:7;
+    x.lineWidth=i%10===0?1.1:0.8;x.beginPath();x.moveTo(tx,0);x.lineTo(tx,len);x.stroke();
+  }
+  x.fillStyle='#1E2A44';x.font='600 11px system-ui,-apple-system,"Segoe UI",Roboto,sans-serif';x.textAlign='center';x.textBaseline='middle';
+  for(let c=0;c<=30;c++)x.fillText(String(c),c*CM,27);
+  x.font='600 10px system-ui,-apple-system,"Segoe UI",Roboto,sans-serif';x.fillText('cm',RULER_LEN/2,48);
+  x.restore();
+}
+
+// ---------- protractor ----------
+function pGeo(P){const u=dirOf(P.ang),up=[u[1],-u[0]];return {u,up,toL:p=>{const v=sub(p,P.o);return [dot(v,u),dot(v,up)];}};}
+function hitPro(p){
+  const [x,y]=pGeo(S.protractor).toL(p);
+  const inside=(y<=0&&y>=-14&&Math.abs(x)<=PRO_R)||(y>0&&Math.hypot(x,y)<=PRO_R+4);
+  if(!inside)return null;
+  if(Math.hypot(x-PRO_R,y)<=0.36*PRO_R)return 'turnR';
+  if(Math.hypot(x+PRO_R,y)<=0.36*PRO_R)return 'turnL';
+  return 'move';
+}
+function drawPro(x,zone){
+  const P=S.protractor,R=PRO_R;
+  x.save();x.translate(P.o[0],P.o[1]);x.rotate(P.ang);
+  if(zone==='turnR'||zone==='turnL'){
+    const sx=zone==='turnR'?1:-1;x.beginPath();x.moveTo(sx*R,0);x.arc(sx*R,0,0.36*R,sx>0?PI:-PI/2,sx>0?PI*1.5:0);x.closePath();
+    x.save();x.beginPath();x.moveTo(-R,14);x.lineTo(-R,0);x.arc(0,0,R,PI,TAU);x.lineTo(R,14);x.closePath();x.clip();
+    x.beginPath();x.arc(sx*R,0,0.36*R,0,TAU);x.fillStyle='rgba(242,179,61,.45)';x.fill();x.restore();
+  }
+  x.beginPath();x.moveTo(-R,14);x.lineTo(-R,0);x.arc(0,0,R,PI,TAU);x.lineTo(R,14);x.closePath();
+  x.fillStyle='rgba(158,196,240,.32)';x.fill();x.strokeStyle='rgba(59,111,182,.95)';x.lineWidth=1.2;x.stroke();
+  x.beginPath();x.arc(0,0,R-52,PI,TAU);x.strokeStyle='rgba(59,111,182,.5)';x.lineWidth=1;x.stroke();
+  x.strokeStyle='#1E2A44';
+  for(let d=0;d<=180;d++){
+    const t=d*PI/180,c=Math.cos(t),s=-Math.sin(t),len=d%10===0?14:d%5===0?10:6;
+    x.lineWidth=d%10===0?1.1:0.7;x.beginPath();x.moveTo(R*c,R*s);x.lineTo((R-len)*c,(R-len)*s);x.stroke();
+  }
+  x.fillStyle='#1E2A44';x.textAlign='center';x.textBaseline='middle';
+  for(let d=0;d<=180;d+=10){
+    const t=d*PI/180,c=Math.cos(t),s=-Math.sin(t);
+    x.font='600 10px system-ui,-apple-system,"Segoe UI",Roboto,sans-serif';x.fillText(String(180-d),(R-24)*c,(R-24)*s);
+    x.font='9px system-ui,-apple-system,"Segoe UI",Roboto,sans-serif';x.fillText(String(d),(R-40)*c,(R-40)*s);
+  }
+  x.lineWidth=1;x.beginPath();x.moveTo(-R,0);x.lineTo(R,0);x.moveTo(0,0);x.lineTo(0,-12);x.stroke();
+  x.beginPath();x.arc(0,0,3,0,TAU);x.stroke();
+  x.restore();
+}
+
+// ---------- drawing helpers ----------
+function rr(x,X,Y,w,h,r){x.moveTo(X+r,Y);x.arcTo(X+w,Y,X+w,Y+h,r);x.arcTo(X+w,Y+h,X,Y+h,r);x.arcTo(X,Y+h,X,Y,r);x.arcTo(X,Y,X+w,Y,r);x.closePath();}
+function ring(x,p){
+  x.beginPath();x.arc(p[0],p[1],8,0,TAU);x.strokeStyle='#E8572A';x.lineWidth=2.2;x.stroke();
+  x.beginPath();x.arc(p[0],p[1],2.2,0,TAU);x.fillStyle='#E8572A';x.fill();
+}
+function label(x,p,text){
+  x.save();x.font='600 13px system-ui,-apple-system,"Segoe UI",Roboto,sans-serif';
+  const w=x.measureText(text).width+16,h=26;
+  const bx=clamp(p[0]-w/2,4,W-w-4),by=clamp(p[1]-h/2,4,H-h-4);
+  x.beginPath();rr(x,bx,by,w,h,13);x.fillStyle='rgba(30,42,68,.92)';x.fill();
+  x.fillStyle='#F6F1E4';x.textAlign='center';x.textBaseline='middle';x.fillText(text,bx+w/2,by+h/2+0.5);
+  x.restore();
+}
+const fmtCm=px=>(px/CM).toFixed(1).replace('.',',')+' cm';
+function rulerLine(){
+  return {t:'line',a:add(G.base,mul(G.u,G.xs)),b:add(G.base,mul(G.u,G.xe)),c:S.color,w:S.width};
+}
+function zoneFor(t){if(G&&G.tool===t)return G.zone;if(!G&&hover&&hover.tool===t)return hover.zone;return null;}
+function drawLive(){
+  const x=liveX;x.clearRect(0,0,W,H);
+  if(G){
+    if(G.k==='pen'||G.k==='line')drawStroke(x,G.s);
+    if(G.k==='rulerDraw'&&Math.abs(G.xe-G.xs)>=1)drawStroke(x,rulerLine());
+    if(G.k==='cDraw'){const C=S.compass,sw=G.hi-G.lo;if(sw>0.004)drawStroke(x,{t:'arc',o:C.c1,r:C.r,a0:G.lo,sw:Math.min(sw,TAU),c:S.color,w:S.width});}
+  }
+  for(const t of S.order){
+    if(!S.show[t]||!S[t])continue;const z=zoneFor(t);
+    if(t==='compass')drawCompass(x,z);else if(t==='ruler')drawRuler(x,z);else drawPro(x,z);
+  }
+  if(S.show.ruler&&S.ruler&&S.ruler.stuck)ring(x,S.ruler.stuck.p);
+  if(G){for(const m of [G.snapA,G.snap,G.target])if(m)ring(x,m);if(G.label)label(x,G.label.p,G.label.text);}
+  const ep=G&&G.k==='erase'?G.last:(!G&&S.mode==='eraser'&&hoverPt&&!hover?hoverPt:null);
+  if(ep){x.beginPath();x.arc(ep[0],ep[1],ERASE_R,0,TAU);x.strokeStyle='rgba(30,42,68,.6)';x.lineWidth=1.5;x.stroke();}
+}
+
+// ---------- tools on screen ----------
+function placeTool(t,force){
+  const off=p=>!p||p[0]<0||p[0]>W||p[1]<0||p[1]>H;
+  if(t==='compass'&&(force||!S.compass||off(S.compass.c1)))S.compass={c1:[W*0.42,H*0.68],r:160,th:0,locked:false};
+  if(t==='ruler'&&(force||!S.ruler||off(S.ruler.o)))S.ruler={o:[Math.max(60,(W-RULER_LEN)/2),H*0.78],ang:0,stuck:null};
+  if(t==='protractor'&&(force||!S.protractor||off(S.protractor.o)))S.protractor={o:[W*0.62,H*0.62],ang:0};
+}
+function toolHit(p){
+  for(let i=S.order.length-1;i>=0;i--){
+    const t=S.order[i];if(!S.show[t]||!S[t])continue;
+    const z=t==='compass'?hitCompass(p):t==='ruler'?hitRuler(p):hitPro(p);
+    if(z)return {tool:t,zone:z};
+  }
+  return null;
+}
+const toFront=t=>{S.order=S.order.filter(o=>o!==t);S.order.push(t);};
+
+// ---------- gestures ----------
+function accept(e){return e.pointerType==='pen'||e.pointerType==='mouse'||(S.allowFinger&&e.pointerType==='touch');}
+function pt(e){return [e.clientX-rect.left,e.clientY-rect.top];}
+
+function startTool(h,p,id){
+  const t=h.tool,z=h.zone;toFront(t);
+  if(t==='compass'){
+    const C=S.compass;
+    if(z==='lock'){C.locked=!C.locked;save();G={k:'noop',id,tool:t,zone:z};return;}
+    if(z==='move')G={k:'cMove',off:sub(C.c1,p)};
+    else if(z==='width')G={k:C.locked?'cTurn':'cWidth',rel:sub(cGeo(C).c3,p),prev:p};
+    else G={k:'cDraw',prev:p,lo:C.th,hi:C.th};
+  }else if(t==='ruler'){
+    const R=S.ruler,g=rGeo(R);
+    if(z==='move')G={k:'rulerMove',off:sub(R.o,p)};
+    else if(z==='turnL'||z==='turnR'){
+      const pivot=R.stuck?R.stuck.p:g.centre,[lx,ly]=g.toL(pivot);
+      G={k:'rulerTurn',pivot,lx,ly,raw:R.ang,prev:p,stuck:!!R.stuck};
+    }else{
+      const base=z==='edgeA'?R.o:add(R.o,mul(g.n,RULER_W));
+      const targets=edgeTargets(base,g.u,g.n),sx=snapEdgeX(dot(sub(p,base),g.u),targets);
+      G={k:'rulerDraw',base,u:g.u,n:g.n,out:z==='edgeA'?mul(g.n,-24):mul(g.n,24),targets,xs:sx.x,xe:sx.x};
+      if(sx.hit)G.snapA=add(base,mul(g.u,sx.x));
+    }
+  }else{
+    const P=S.protractor;
+    if(z==='move')G={k:'pMove',off:sub(P.o,p)};
+    else G={k:'pTurn',raw:P.ang,prev:p};
+  }
+  G.id=id;G.tool=t;G.zone=z;
+}
+function moveGesture(e,p){
+  const k=G.k;
+  if(k==='pen'){
+    const evs=e.getCoalescedEvents?e.getCoalescedEvents():[];
+    const list=evs.length?evs.map(pt):[p],P=G.s.p;
+    for(const q of list)if(dist(q,P[P.length-1])>=0.7)P.push([Math.round(q[0]*10)/10,Math.round(q[1]*10)/10]);
+  }else if(k==='line'){
+    const sn=snapPoint(p);G.s.b=sn.p;G.snap=sn.hit?sn.p:null;
+    G.label={p:add(sn.p,[0,-26]),text:fmtCm(dist(G.s.a,G.s.b))};
+  }else if(k==='erase'){
+    eraseAlong(G.last,p);G.last=p;
+  }else if(k==='cMove'){
+    const sn=snapPoint(add(p,G.off));S.compass.c1=sn.p;G.snap=sn.hit?sn.p:null;
+  }else if(k==='cWidth'){
+    const C=S.compass,sn=snapPoint(add(p,G.rel)),v=sub(sn.p,C.c1),d=Math.hypot(v[0],v[1]);
+    if(d>1e-6)C.th=Math.atan2(v[1],v[0]);
+    C.r=clamp(d,R_MIN,R_MAX);G.snap=sn.hit&&d<=R_MAX?sn.p:null;
+    const g=cGeo(C);G.label={p:add(g.hEnd,mul(g.up,22)),text:fmtCm(C.r)};
+  }else if(k==='cTurn'||k==='cDraw'){
+    const C=S.compass;C.th+=sweep(G.prev,p,C.c1);G.prev=p;
+    if(k==='cDraw'){G.lo=Math.min(G.lo,C.th);G.hi=Math.max(G.hi,C.th);}
+  }else if(k==='rulerMove'){
+    S.ruler.o=add(p,G.off);stickRuler();
+  }else if(k==='rulerTurn'){
+    const R=S.ruler;G.raw+=sweep(G.prev,p,G.pivot);G.prev=p;
+    const s=snapTurn(G.raw,G.pivot,G.lx,-RULER_PAD,RULER_LEN+RULER_PAD,G.stuck);
+    R.ang=s.ang;G.target=s.target;
+    const u=dirOf(R.ang),n=[-u[1],u[0]];R.o=sub(sub(G.pivot,mul(u,G.lx)),mul(n,G.ly));
+    const g=rGeo(R),knob=g.knobs[G.zone==='turnL'?0:1],deg=Math.round(normAng(-R.ang)*180/PI)%180;
+    G.label={p:add(knob,mul(g.n,-40)),text:deg+'°'};
+  }else if(k==='rulerDraw'){
+    const sx=snapEdgeX(dot(sub(p,G.base),G.u),G.targets,G.xs);G.xe=sx.x;
+    const end=add(G.base,mul(G.u,G.xe));G.snap=sx.hit?end:null;
+    G.label={p:add(end,G.out),text:fmtCm(Math.abs(G.xe-G.xs))};
+  }else if(k==='pMove'){
+    const sn=snapPoint(add(p,G.off));S.protractor.o=sn.p;G.snap=sn.hit?sn.p:null;
+  }else if(k==='pTurn'){
+    const P=S.protractor;G.raw+=sweep(G.prev,p,P.o);G.prev=p;
+    const s=snapTurn(G.raw,P.o,0,-4*PRO_R,4*PRO_R,true);P.ang=s.ang;G.target=s.target;
+  }
+  requestLive();
+}
+function endGesture(cancelled){
+  const g=G;G=null;
+  if(!cancelled){
+    if(g.k==='pen')addStroke(g.s);
+    else if(g.k==='line'){if(dist(g.s.a,g.s.b)>=5)addStroke(g.s);}
+    else if(g.k==='erase'){if(g.gone.size)commit(S.strokes.filter(s=>!g.gone.has(s)));}
+    else if(g.k==='cDraw'){
+      const C=S.compass,sw=g.hi-g.lo;
+      if(sw>0.004)addStroke(sw>=TAU?{t:'arc',o:C.c1.slice(),r:C.r,a0:0,sw:TAU,c:S.color,w:S.width}
+                                  :{t:'arc',o:C.c1.slice(),r:C.r,a0:normAng(g.lo),sw,c:S.color,w:S.width});
+      C.th=normAng(C.th);
+    }
+    else if(g.k==='rulerDraw'){
+      if(Math.abs(g.xe-g.xs)>=4)addStroke({t:'line',a:add(g.base,mul(g.u,g.xs)),b:add(g.base,mul(g.u,g.xe)),c:S.color,w:S.width});
+    }
+  }else if(g.k==='erase')drawInk();
+  if(g.tool)save();
+  requestLive();
+}
+function eraseAt(p){
+  let hit=false;
+  for(const s of S.strokes){if(G.gone.has(s))continue;if(distToStroke(p,s)<=ERASE_R+s.w/2){G.gone.add(s);hit=true;}}
+  if(hit)drawInk(G.gone);
+}
+function eraseAlong(a,b){const n=Math.max(1,Math.ceil(dist(a,b)/4));for(let i=1;i<=n;i++)eraseAt(add(a,mul(sub(b,a),i/n)));}
+
+liveC.addEventListener('pointerdown',e=>{
+  if(!accept(e)||G)return;
+  e.preventDefault();closePops();
+  rect=stage.getBoundingClientRect();
+  const p=pt(e),id=e.pointerId;
+  try{liveC.setPointerCapture(id);}catch(_){}
+  hover=null;
+  const sideButton=e.button===2||e.button===5||(e.buttons&2)||(e.buttons&32);
+  if(sideButton){G={k:'erase',id,gone:new Set(),last:p};eraseAt(p);requestLive();return;}
+  const h=toolHit(p);
+  if(h)startTool(h,p,id);
+  else if(S.mode==='eraser'){G={k:'erase',id,gone:new Set(),last:p};eraseAt(p);}
+  else if(S.mode==='line'){const sn=snapPoint(p);G={k:'line',id,s:{t:'line',a:sn.p,b:sn.p,c:S.color,w:S.width},snapA:sn.hit?sn.p:null};}
+  else G={k:'pen',id,s:{t:'pen',p:[[Math.round(p[0]*10)/10,Math.round(p[1]*10)/10]],c:S.color,w:S.width}};
+  requestLive();
+});
+liveC.addEventListener('pointermove',e=>{
+  if(!accept(e))return;
+  const p=pt(e);
+  if(G){if(e.pointerId===G.id)moveGesture(e,p);return;}
+  hoverPt=p;hover=toolHit(p);
+  liveC.style.cursor=hover?(hover.zone.startsWith('edge')?'crosshair':'grab'):(S.mode==='eraser'?'cell':'crosshair');
+  requestLive();
+});
+liveC.addEventListener('pointerup',e=>{if(G&&e.pointerId===G.id)endGesture(false);});
+liveC.addEventListener('pointercancel',e=>{if(G&&e.pointerId===G.id)endGesture(true);});
+liveC.addEventListener('pointerleave',()=>{if(!G){hover=null;hoverPt=null;requestLive();}});
+liveC.addEventListener('contextmenu',e=>e.preventDefault());
+
+// ---------- saving between visits ----------
+function save(){
+  clearTimeout(save.t);
+  save.t=setTimeout(()=>{
+    try{localStorage.setItem(STORE,JSON.stringify({v:1,strokes:S.strokes,mode:S.mode,color:S.color,width:S.width,bg:S.bg,
+      allowFinger:S.allowFinger,exportWhite:S.exportWhite,recent:S.recent,show:S.show,order:S.order,
+      compass:S.compass,ruler:S.ruler,protractor:S.protractor}));}catch(_){}
+  },300);
+}
+const isPt=p=>Array.isArray(p)&&p.length===2&&isFinite(p[0])&&isFinite(p[1]);
+function validStroke(s){
+  if(!s||typeof s.c!=='string'||!isFinite(s.w))return false;
+  if(s.t==='line')return isPt(s.a)&&isPt(s.b);
+  if(s.t==='arc')return isPt(s.o)&&isFinite(s.r)&&isFinite(s.a0)&&isFinite(s.sw);
+  if(s.t==='pen')return Array.isArray(s.p)&&s.p.length>0&&s.p.every(isPt);
+  return false;
+}
+function load(){
+  let d=null;try{d=JSON.parse(localStorage.getItem(STORE)||'null');}catch(_){}
+  if(!d||d.v!==1)return;
+  if(Array.isArray(d.strokes))S.strokes=d.strokes.filter(validStroke);
+  if(['pen','line','eraser'].includes(d.mode))S.mode=d.mode;
+  if(typeof d.color==='string')S.color=d.color;
+  if(WIDTHS.some(o=>o.w===d.width))S.width=d.width;
+  if(d.bg==='grid'||d.bg==='plain')S.bg=d.bg;
+  S.allowFinger=!!d.allowFinger;S.exportWhite=!!d.exportWhite;
+  if(Array.isArray(d.recent))S.recent=d.recent.filter(c=>typeof c==='string').slice(0,4);
+  if(d.show)for(const t of ['compass','ruler','protractor'])S.show[t]=!!d.show[t];
+  if(Array.isArray(d.order)&&d.order.length===3&&['compass','ruler','protractor'].every(t=>d.order.includes(t)))S.order=d.order;
+  if(d.compass&&isPt(d.compass.c1)&&isFinite(d.compass.r)&&isFinite(d.compass.th))S.compass={c1:d.compass.c1,r:clamp(d.compass.r,R_MIN,R_MAX),th:d.compass.th,locked:!!d.compass.locked};
+  if(d.ruler&&isPt(d.ruler.o)&&isFinite(d.ruler.ang))S.ruler={o:d.ruler.o,ang:d.ruler.ang,stuck:d.ruler.stuck&&isPt(d.ruler.stuck.p)?d.ruler.stuck:null};
+  if(d.protractor&&isPt(d.protractor.o)&&isFinite(d.protractor.ang))S.protractor={o:d.protractor.o,ang:d.protractor.ang};
+}
+
+// ---------- export ----------
+function strokeBounds(list){
+  let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity;
+  const inc=(p,pad)=>{x0=Math.min(x0,p[0]-pad);y0=Math.min(y0,p[1]-pad);x1=Math.max(x1,p[0]+pad);y1=Math.max(y1,p[1]+pad);};
+  for(const s of list){
+    const pad=s.w/2+1;
+    if(s.t==='line'){inc(s.a,pad);inc(s.b,pad);}
+    else if(s.t==='arc'){const sw=isFull(s)?TAU:s.sw;for(let i=0;i<=96;i++)inc(add(s.o,mul(dirOf(s.a0+sw*i/96),s.r)),pad);inc(s.o,Math.max(1.6,s.w*0.55)+1);}
+    else for(const p of s.p)inc(p,pad+1);
+  }
+  return x0<x1?{x0,y0,x1,y1}:null;
+}
+function exportCanvas(white){
+  const b=strokeBounds(S.strokes);if(!b)return null;
+  const m=16,w=b.x1-b.x0+2*m,h=b.y1-b.y0+2*m;
+  let k=3;if(w*h*k*k>16e6)k=Math.sqrt(16e6/(w*h));
+  const c=document.createElement('canvas');c.width=Math.ceil(w*k);c.height=Math.ceil(h*k);
+  const x=c.getContext('2d');
+  if(white){x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);}
+  x.setTransform(k,0,0,k,(m-b.x0)*k,(m-b.y0)*k);
+  for(const s of S.strokes)drawStroke(x,s);
+  return c;
+}
+function fileName(){
+  const d=new Date(),z=n=>String(n).padStart(2,'0');
+  return 'construction-'+d.getFullYear()+'-'+z(d.getMonth()+1)+'-'+z(d.getDate())+'-'+z(d.getHours())+z(d.getMinutes())+'.png';
+}
+function savePicture(share){
+  const c=exportCanvas(S.exportWhite);
+  if(!c){toast('Draw something first');return;}
+  c.toBlob(async blob=>{
+    if(!blob){toast('That picture could not be made');return;}
+    const name=fileName();
+    if(share){
+      try{const f=new File([blob],name,{type:'image/png'});if(navigator.canShare&&navigator.canShare({files:[f]})){await navigator.share({files:[f]});closePops();return;}}catch(_){return;}
+    }
+    const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;
+    document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),8000);
+    closePops();toast('Picture saved');
+  },'image/png');
+}
+
+// ---------- toolbar and popovers ----------
+let toastT=0;
+function toast(msg){const t=$('toast');t.textContent=msg;t.classList.add('show');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('show'),2400);}
+function syncUI(){
+  document.querySelectorAll('[data-mode]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.mode===S.mode)));
+  document.querySelectorAll('[data-tool]').forEach(b=>b.setAttribute('aria-pressed',String(!!S.show[b.dataset.tool])));
+  document.querySelectorAll('[data-bg]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.bg===S.bg)));
+  document.querySelectorAll('[data-bgx]').forEach(b=>b.setAttribute('aria-pressed',String((b.dataset.bgx==='white')===S.exportWhite)));
+  $('inkDot').style.background=S.color;
+  $('undo').disabled=!S.past.length;$('redo').disabled=!S.future.length;
+  $('fingerOpt').checked=S.allowFinger;
+  buildSwatches();buildWidths();
+}
+function setColour(c,remember){
+  S.color=c;
+  if(remember&&!PALETTE.includes(c)){S.recent=[c].concat(S.recent.filter(r=>r!==c)).slice(0,4);}
+  syncUI();save();requestLive();
+}
+function swatch(c){
+  const b=document.createElement('button');b.className='sw';b.style.background=c;b.title=c;b.setAttribute('aria-label','Colour '+c);
+  b.setAttribute('aria-pressed',String(c.toLowerCase()===S.color.toLowerCase()));
+  b.addEventListener('click',()=>{setColour(c,false);closePops();});return b;
+}
+function buildSwatches(){
+  const sw=$('swatches'),rc=$('recent');sw.textContent='';rc.textContent='';
+  PALETTE.forEach(c=>sw.appendChild(swatch(c)));
+  S.recent.forEach(c=>rc.appendChild(swatch(c)));
+  $('recentTitle').hidden=rc.hidden=!S.recent.length;
+}
+function buildWidths(){
+  const box=$('widths');box.textContent='';
+  for(const o of WIDTHS){
+    const b=document.createElement('button');b.className='wbtn';b.setAttribute('aria-pressed',String(o.w===S.width));
+    const i=document.createElement('i');i.style.height=o.w+'px';i.style.background=S.color;
+    const sp=document.createElement('span');sp.textContent=o.label;
+    b.append(sp,i);b.addEventListener('click',()=>{S.width=o.w;syncUI();save();closePops();});box.appendChild(b);
+  }
+}
+let openPop=null;
+function showPop(pop,btn,side){
+  if(openPop===pop){closePops();return;}
+  closePops();pop.classList.add('open');openPop=pop;
+  const r=btn.getBoundingClientRect(),pw=pop.offsetWidth,ph=pop.offsetHeight;
+  if(side==='right'){pop.style.left=(r.right+10)+'px';pop.style.top=clamp(r.top-8,8,innerHeight-ph-8)+'px';}
+  else{pop.style.left=clamp(r.right-pw,8,innerWidth-pw-8)+'px';pop.style.top=(r.bottom+10)+'px';}
+}
+function closePops(){if(openPop){openPop.classList.remove('open');openPop=null;}}
+document.addEventListener('pointerdown',e=>{
+  if(openPop&&!openPop.contains(e.target)&&!e.target.closest('#colourBtn,#widthBtn,#saveBtn'))closePops();
+},true);
+
+document.querySelectorAll('[data-mode]').forEach(b=>b.addEventListener('click',()=>{S.mode=b.dataset.mode;syncUI();save();requestLive();}));
+document.querySelectorAll('[data-tool]').forEach(b=>b.addEventListener('click',()=>{
+  const t=b.dataset.tool;S.show[t]=!S.show[t];
+  if(S.show[t]){placeTool(t,false);toFront(t);}
+  syncUI();save();requestLive();
+}));
+document.querySelectorAll('[data-bg]').forEach(b=>b.addEventListener('click',()=>{S.bg=b.dataset.bg;drawBg();syncUI();save();}));
+document.querySelectorAll('[data-bgx]').forEach(b=>b.addEventListener('click',()=>{S.exportWhite=b.dataset.bgx==='white';syncUI();save();}));
+$('colourBtn').addEventListener('click',()=>showPop($('colourPop'),$('colourBtn'),'right'));
+$('widthBtn').addEventListener('click',()=>showPop($('widthPop'),$('widthBtn'),'right'));
+$('saveBtn').addEventListener('click',()=>showPop($('savePop'),$('saveBtn'),'below'));
+$('picker').addEventListener('input',e=>setColour(e.target.value,false));
+$('picker').addEventListener('change',e=>{setColour(e.target.value,true);closePops();});
+$('undo').addEventListener('click',undo);
+$('redo').addEventListener('click',redo);
+$('clearBtn').addEventListener('click',()=>{
+  if(!S.strokes.length){toast('Nothing to clear');return;}
+  commit([]);toast('Cleared. Undo brings it back.');
+});
+$('doSave').addEventListener('click',()=>savePicture(false));
+$('doShare').addEventListener('click',()=>savePicture(true));
+$('helpBtn').addEventListener('click',()=>{closePops();$('help').classList.add('open');});
+$('helpClose').addEventListener('click',()=>$('help').classList.remove('open'));
+$('help').addEventListener('click',e=>{if(e.target===$('help'))$('help').classList.remove('open');});
+$('fingerOpt').addEventListener('change',e=>{S.allowFinger=e.target.checked;save();});
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'){closePops();$('help').classList.remove('open');return;}
+  if(!(e.ctrlKey||e.metaKey))return;
+  const k=e.key.toLowerCase();
+  if(k==='z'){e.preventDefault();e.shiftKey?redo():undo();}
+  else if(k==='y'){e.preventDefault();redo();}
+});
+try{
+  const f=new File([''],'a.png',{type:'image/png'});
+  if(navigator.canShare&&navigator.canShare({files:[f]}))$('doShare').hidden=false;
+}catch(_){}
+
+// ---------- start ----------
+load();
+window.addEventListener('resize',resize);
+resize();
+for(const t of ['compass','ruler','protractor'])if(S.show[t])placeTool(t,false);
+syncUI();requestLive();
+
+// test hook
+window.__C={S,cGeo,rGeo,pGeo,snapData,toolHit,undo,redo,exportCanvas,strokeBounds,get G(){return G;},size:()=>({W,H}),
+  reset(){S.strokes=[];S.past=[];S.future=[];for(const t of ['compass','ruler','protractor'])placeTool(t,true);changed();}};
+})();
+</script>
+</body>
+</html>
